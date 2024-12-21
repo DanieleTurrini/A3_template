@@ -39,13 +39,13 @@ SOLVER_MAX_ITER = 3
 SIMULATOR = "pinocchio" #"mujoco" or "pinocchio" or "ideal"
 POS_BOUNDS_SCALING_FACTOR = 0.2
 VEL_BOUNDS_SCALING_FACTOR = 2.0
-TORQUE_BOUNDS_SCALING_FACTOR = 0.05
-qMin = np.array([-2.0*3.14,-2.0*3.14])#POS_BOUNDS_SCALING_FACTOR * robot.model.lowerPositionLimit
+TORQUE_BOUNDS_SCALING_FACTOR = 0.04
+qMin = np.array([-2.0*np.pi,-2.0*np.pi])#POS_BOUNDS_SCALING_FACTOR * robot.model.lowerPositionLimit
 qMax = -qMin#POS_BOUNDS_SCALING_FACTOR * robot.model.upperPositionLimit
 vMax = np.array([10.0,10.0])#VEL_BOUNDS_SCALING_FACTOR * robot.model.velocityLimit
 dt_sim = 0.002
 N_sim = 200
-q0 = np.array([-3.14, 3.14/4 ])  # initial joint configuration
+q0 = np.array([-np.pi, 0 ])  # initial joint configuration
 dq0= np.zeros(nq)  # initial joint velocities
 
 dt = 0.010 # time step MPC
@@ -53,7 +53,7 @@ N = int(N_sim/2)  # time horizon MPC
 q_des = np.zeros(nq)
 w_p = 1e2   # position weight
 w_v = 0e-6  # velocity weight
-w_a = 1e-5  # acceleration weight
+w_a = 1e-8  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
 USE_TERMINAL_CONSTRAINT = 0
 
@@ -102,8 +102,8 @@ inv_dyn = cs.Function('inv_dyn', [state, ddq], [tau])
 # pre-compute state and torque bounds
 lbx = qMin.tolist() + (-vMax).tolist()
 ubx = qMax.tolist() + vMax.tolist()
-tau_min = (np.array([-10.0, -5.0])*TORQUE_BOUNDS_SCALING_FACTOR).tolist() #(-robot.model.effortLimit).tolist()
-tau_max = (np.array([10.0, 5.0])*TORQUE_BOUNDS_SCALING_FACTOR).tolist() #robot.model.effortLimit.tolist()
+tau_min = (np.array([-10.0, 0])*TORQUE_BOUNDS_SCALING_FACTOR).tolist() #(-robot.model.effortLimit).tolist()
+tau_max = (np.array([10.0, 0])*TORQUE_BOUNDS_SCALING_FACTOR).tolist() #robot.model.effortLimit.tolist()
 print('lbx',lbx)
 print('ubx',ubx)
 print('tau_min',tau_min)
