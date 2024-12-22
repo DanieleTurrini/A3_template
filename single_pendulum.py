@@ -145,12 +145,11 @@ sol = opti.solve()
 
 opts["ipopt.max_iter"] = SOLVER_MAX_ITER
 opti.solver("ipopt", opts)
+mean_comp_time = 0
 
+# Start the MPC loop
 for i in range(N_sim):
-    """try:
-        sol = opti.solve()
-    except:
-        sol = opti.debug.value"""
+    start_time = clock()
 
     if(DO_WARM_START):
         # use current solution as initial guess for next problem
@@ -164,6 +163,15 @@ for i in range(N_sim):
         # initialize dual variables
         lam_g0 = sol.value(opti.lam_g)
         opti.set_initial(opti.lam_g, lam_g0)
+
+    try:
+        sol = opti.solve()
+    except:
+        print("Convergence failed!")
+        sol = opti.debug.value
+
+    end_time = clock()
+    mean_comp_time += (end_time-start_time)/N_sim
 
     # Extract the optimal control input
     u_opt = sol.value(U[0])
@@ -179,7 +187,11 @@ for i in range(N_sim):
     data[i,2] = u_opt
 
     # Log results (e.g., position, velocity, control input)
-    print(f"Step {i}, Position: {x[0]:.3f}, Velocity: {x[1]:.3f}, Torque: {u_opt:.3f}")
+    print("Comput. time: %.3f s"%(end_time-start_time), 
+          "Iters: %3d"%sol.stats()['iter_count'], 
+          "Tracking err: %.3f"%np.linalg.norm(p_ee_des-forward_kinematics(x[:nq])),
+          "Return status", sol.stats()["return_status"])
+    #print(f"Step {i}, Position: {x[0]:.3f}, Velocity: {x[1]:.3f}, Torque: {u_opt:.3f}")
 
 # Plots
 if DO_PLOTS:

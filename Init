@@ -1,0 +1,2 @@
+export PYTHONPATH=$PYTHONPATH:/Users/danieleturrini
+export PYTHONPATH=$PYTHONPATH:/Users/danieleturrini/orc
