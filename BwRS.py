@@ -49,7 +49,7 @@ def is_in_BwRS (robot, x_init, N, time_step, X_bounds, U_bounds):
     # create all the decision variables
     X, U = [], []
     X += [opti.variable(nx)] # do not apply pos/vel bounds on initial state
-    for k in range(1, N+1): 
+    for k in range(1, N+1):
         X += [opti.variable(nx)]
         opti.subject_to( opti.bounded(lbx, X[-1], ubx) )
     for k in range(N): 
@@ -82,10 +82,22 @@ def is_in_BwRS (robot, x_init, N, time_step, X_bounds, U_bounds):
         opti.set_value(param_x_init, x_init)
         sol = opti.solve()
         #per fare una prova plotto direttamente l'ultimo stato che il solver ha calcolato:
-        print(sol.value(X[-1]))
+        #print(sol.value(X[-1]))
+        print("1")
         #return True  # Feasible solution
+        return 1
     except:
         sol = opti.debug
         #per fare una prova plotto direttamente l'ultimo stato che il solver ha calcolato:
-        print(sol.value(X[-1]))
+        #print(sol.value(X[-1]))
+        print("0")
+        """X_values = np.array([sol.value(X[i]) for i in range(len(X))])
+        U_values = np.array([sol.value(U[i]) for i in range(len(U))])
+
+        print(X_values)
+        print(U_values)
+        for i in range(len(U)):
+            print(inv_dyn(sol.value(X[i]),sol.value(U[i])))"""
+        
         #return False  # Unfeasible solution
+        return 0

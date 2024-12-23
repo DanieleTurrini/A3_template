@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-
-    
+  
 class NeuralNetwork(nn.Module):
     """ A simple feedforward neural network. """
     def __init__(self, input_size, hidden_size, output_size, activation=nn.Tanh(), ub=None):
@@ -14,6 +13,13 @@ class NeuralNetwork(nn.Module):
             nn.Linear(hidden_size, output_size),
             activation,
         )
+
+        """ input_size: Number of input features.
+            hidden_size: Number of units in the hidden layers.
+            output_size: Number of output features.
+            activation: Activation function applied after each linear transformation (default is nn.Tanh).
+            ub: Upper bound to scale the network's output (default is 1)."""
+
         self.ub = ub if ub is not None else 1 # upper bound of the output layer
         self.initialize_weights()
 

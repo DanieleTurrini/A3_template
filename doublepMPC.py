@@ -40,7 +40,7 @@ DO_PLOTS = True
 SIMULATOR = "pinocchio" #"mujoco" or "pinocchio" or "ideal"
 POS_BOUNDS_SCALING_FACTOR = 0.2
 VEL_BOUNDS_SCALING_FACTOR = 2.0
-TORQUE_BOUNDS_SCALING_FACTOR = 0.2
+TORQUE_BOUNDS_SCALING_FACTOR = 4
 qMin = np.array([-2.0*np.pi,-2.0*np.pi])#POS_BOUNDS_SCALING_FACTOR * robot.model.lowerPositionLimit
 qMax = -qMin#POS_BOUNDS_SCALING_FACTOR * robot.model.upperPositionLimit
 vMax = np.array([10.0,10.0])#VEL_BOUNDS_SCALING_FACTOR * robot.model.velocityLimit
@@ -53,7 +53,7 @@ dt = 0.010 # time step MPC
 N = int(N_sim/2)  # time horizon MPC
 q_des = np.zeros(nq)
 w_p = 1e2   # position weight
-w_v = 1e-1#0e-6  # velocity weight
+w_v = 1e1  # velocity weight
 w_a = 1e-2  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
 USE_TERMINAL_CONSTRAINT = 1
@@ -166,8 +166,6 @@ opti.set_value(param_x_init, x)
 # print("Constraints added to the optimization:")
 # for i, constraint in enumerate(cs.vertsplit(opti.g, 1)):
 #    print(f"Constraint {i}: {constraint}")
-
-
 
 sol = opti.solve()
 opts["ipopt.max_iter"] = SOLVER_MAX_ITER
