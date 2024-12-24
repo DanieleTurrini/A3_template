@@ -34,13 +34,13 @@ SPHERE_RGBA = np.array([1, 0, 0, 1.])
 # - INCREASING THE MAX NUMBER OF ITERATIONS OF THE SOLVER
 DO_WARM_START = True
 SOLVER_TOLERANCE = 1e-4
-SOLVER_MAX_ITER = 3
+SOLVER_MAX_ITER = 30
 
 DO_PLOTS = True
 SIMULATOR = "pinocchio" #"mujoco" or "pinocchio" or "ideal"
 POS_BOUNDS_SCALING_FACTOR = 0.2
 VEL_BOUNDS_SCALING_FACTOR = 2.0
-TORQUE_BOUNDS_SCALING_FACTOR = 4
+TORQUE_BOUNDS_SCALING_FACTOR = 0.04
 qMin = np.array([-2.0*np.pi,-2.0*np.pi])#POS_BOUNDS_SCALING_FACTOR * robot.model.lowerPositionLimit
 qMax = -qMin#POS_BOUNDS_SCALING_FACTOR * robot.model.upperPositionLimit
 vMax = np.array([10.0,10.0])#VEL_BOUNDS_SCALING_FACTOR * robot.model.velocityLimit
@@ -53,10 +53,10 @@ dt = 0.010 # time step MPC
 N = int(N_sim/2)  # time horizon MPC
 q_des = np.zeros(nq)
 w_p = 1e2   # position weight
-w_v = 1e1  # velocity weight
-w_a = 1e-2  # acceleration weight
+w_v = 0e1  # velocity weight
+w_a = 1e-8  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
-USE_TERMINAL_CONSTRAINT = 1
+USE_TERMINAL_CONSTRAINT = 0
 
 
 if(SIMULATOR=="mujoco"):
@@ -103,8 +103,8 @@ inv_dyn = cs.Function('inv_dyn', [state, ddq], [tau])
 # pre-compute state and torque bounds
 lbx = qMin.tolist() + (-vMax).tolist()
 ubx = qMax.tolist() + vMax.tolist()
-tau_min = (np.array([-10.0, -10.0])*TORQUE_BOUNDS_SCALING_FACTOR).tolist() #(-robot.model.effortLimit).tolist()
-tau_max = (np.array([10.0, 10.0])*TORQUE_BOUNDS_SCALING_FACTOR).tolist() #robot.model.effortLimit.tolist()
+tau_min = (np.array([-10.0, 0])*TORQUE_BOUNDS_SCALING_FACTOR).tolist() #(-robot.model.effortLimit).tolist()
+tau_max = (np.array([10.0, 0])*TORQUE_BOUNDS_SCALING_FACTOR).tolist() #robot.model.effortLimit.tolist()
 print('lbx',lbx)
 print('ubx',ubx)
 print('tau_min',tau_min)
@@ -171,7 +171,7 @@ sol = opti.solve()
 opts["ipopt.max_iter"] = SOLVER_MAX_ITER
 opti.solver("ipopt", opts)
 
-data = np.zeros((N_sim, 6))
+data = np.zeros((N_sim, 8))
 
 print("Start the MPC loop")
 for i in range(N_sim):
@@ -212,6 +212,8 @@ for i in range(N_sim):
     data[i][3] = x[3] # joint 2 vel
     data[i][4] = tau[0] #sol.value(U[1][0]) # joint 1 torque
     data[i][5] = tau[1] #sol.value(U[1][1]) # joint 2 torque
+    data[i][6] = sol.value(U[1][0]) # joint 1 torque
+    data[i][7] = sol.value(U[1][1]) # joint 2 torque
 
     if(SIMULATOR=="mujoco"):
         # do a proper simulation with Mujoco
@@ -281,5 +283,18 @@ if(DO_PLOTS):
     plt.title('Joint torques')
     plt.legend()
     plt.grid(True)
+
+    # Plot of joints torques
+    plt.figure(figsize=(10, 6))
+    for i in range(nq):
+        plt.plot(time, data[:,i+6], label=f'acc {i}', alpha=0.7)
+        #plt.plot(time, np.full_like(time, tau_max[i]), linestyle='dotted',label=f'Maximum torque joint {i}' )
+        #plt.plot(time, np.full_like(time, tau_min[i]), linestyle='dotted',label=f'Minimum torque joint {i}' )
+    plt.xlabel('Time [s]')
+    plt.ylabel('Joint acc')
+    plt.title('Joint acc')
+    plt.legend()
+    plt.grid(True)
+   
    
     plt.show()

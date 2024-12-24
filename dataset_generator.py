@@ -19,25 +19,7 @@ N = int(N_sim/8)  # time horizon MPC
 
 robot = load("double_pendulum")
 
-
-
-
-# Define bounds and step size
-pos_bounds = [(-2.0 * np.pi, 2.0 * np.pi), (-2.0 * np.pi, 2.0 * np.pi)]  # (min, max) for each pos dimension
-v_bounds = [(-3.0, 3.0), (-3.0, 3.0)]  # (min, max) for each vel dimension
-step = 0.5
-
-# Create grids for positions and velocities
-pos_grid = np.array(np.meshgrid(*pos_bounds)).T.reshape(-1, len(pos_bounds))  # 2D positions
-vel_grid = np.array(np.meshgrid(*v_bounds)).T.reshape(-1, len(v_bounds))  # 2D velocities
-
-# Combine position and velocity grids to form the dataset
-dataset = np.array([np.hstack((p, v)) for p in pos_grid for v in vel_grid])
-
-print(len(dataset))
-
-
-'''# Generate a Dataset
+# Generate a Dataset
 num_samples = 500
 pos = np.random.uniform(-2.0*np.pi,2.0*np.pi, size=(num_samples, 2))
 vel = np.random.uniform(-3*vMax,3*vMax, size=(num_samples, 2))
@@ -49,5 +31,6 @@ for i in range(num_samples):
     states[i] = [pos[i, 0], pos[i, 1], vel[i, 0], vel[i, 1]]
 
 labels = np.array([is_in_BwRS(robot,state,N,dt, q_bound, tau_bound) for state in states])
-np.savez("training_data.npz", states=states, labels=labels)'''
+
+np.savez("training_data.npz", states=states, labels=labels)
 
