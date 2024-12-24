@@ -32,5 +32,5 @@ for i in range(num_samples):
 
 labels = np.array([is_in_BwRS(robot,state,N,dt, q_bound, tau_bound) for state in states])
 
-np.savez("training_data.npz", states=states, labels=labels)
+np.savez("/Users/danieleturrini/orc/A3_template/dataset/training_data.npz", states=states, labels=labels)
 

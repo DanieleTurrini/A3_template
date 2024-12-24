@@ -36,6 +36,9 @@ class NeuralNetwork(nn.Module):
     def create_casadi_function(self, robot_name, NN_DIR, input_size, load_weights):
         from casadi import MX, Function
         import l4casadi as l4c
+        import torch
+
+        print(self.linear_stack)
 
         # if load_weights is True, we load the neural-network weights from a ".pt" file
         if(load_weights):
@@ -44,12 +47,18 @@ class NeuralNetwork(nn.Module):
             nn_data = torch.load(nn_name, map_location=device)
             self.load_state_dict(nn_data['model'])
 
-        state = MX.sym("x", input_size)        
+        state = MX.sym("x",input_size)
+         
+        print("state:\n",state)
+        print(f"State shape: {state.shape}")
+
         self.l4c_model = l4c.L4CasADi(self,
                                       device='cuda' if torch.cuda.is_available() else 'cpu',
                                       name=f'{robot_name}_model',
                                       build_dir=f'{NN_DIR}nn_{robot_name}')
+        
+        print(f"Input to model: {self.l4c_model(state).shape}")
+
         self.nn_model = self.l4c_model(state)
         # This is the function that you can use in a casadi problem
         self.nn_func = Function('nn_func', [state], [self.nn_model])
- 

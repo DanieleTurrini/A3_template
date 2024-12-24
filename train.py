@@ -7,9 +7,12 @@ import torch.nn as nn
 import os
 
 # Load data
-data = np.load("training_data.npz")
+data = np.load("/Users/danieleturrini/orc/A3_template/dataset/training_data.npz")
 states = torch.tensor(data['states'], dtype=torch.float32)
 labels = torch.tensor(data['labels'], dtype=torch.float32).unsqueeze(1)
+
+# for i in range(len(states)):
+#     print(states[i,:],labels[i,:])
 
 # Split data into training and testing sets
 dataset = TensorDataset(states, labels)
@@ -41,7 +44,7 @@ criterion = nn.BCEWithLogitsLoss()  # For binary classification
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # Training loop
-num_epochs = 20
+num_epochs = 30
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.to(device)
 
@@ -81,13 +84,13 @@ with torch.no_grad():
 
 # EXPORT THE MODEL WITH L4CASADI
 # Save the model weights
-NN_DIR = "./nn_models"  # Directory to save the model
+NN_DIR = "/Users/danieleturrini/orc/A3_template/nn_models/"  # Directory to save the model
 if not os.path.exists(NN_DIR):
-    os.makedirs(NN_DIR)
+    print("directory not found - creating new directory")
 torch.save({'model': model.state_dict()}, f"{NN_DIR}model.pt")
 
 # Export the model to CasADi
-robot_name = "my_robot"
+robot_name = "doublependulum"
 load_weights = True
 model.create_casadi_function(robot_name, NN_DIR, input_size, load_weights)
 
