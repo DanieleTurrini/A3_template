@@ -1,2 +1,3 @@
 export PYTHONPATH=$PYTHONPATH:/Users/danieleturrini
 export PYTHONPATH=$PYTHONPATH:/Users/danieleturrini/orc
+export PYTHONPATH=$PYTHONPATH:/Users/danieleturrini/orc/A3_template

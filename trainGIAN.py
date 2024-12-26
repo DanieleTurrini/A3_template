@@ -6,11 +6,11 @@ from torch.utils.data import DataLoader, TensorDataset, random_split
 import torch.nn as nn
 import torch.optim as optim
 from neural_network import NeuralNetwork
-from orc.A3_template.BwRS import is_in_BwRS
+from A3_template.BwRS import is_in_BwRS
 from example_robot_data.robots_loader import load
 import multiprocessing  # Use native Python multiprocessing module
 import l4casadi as l4c
-from casadi import MX, Function
+from casadi import MX, Function, exp, if_else
 
 # GLOBAL COMPUTE_LABEL FUNCTION (moved out of generate_data)
 def compute_label(state, robot, N, dt, q_bound, tau_bound):
@@ -28,7 +28,7 @@ def compute_label(state, robot, N, dt, q_bound, tau_bound):
     return is_in_BwRS(robot, state, N, dt, q_bound, tau_bound)
 
 # DATA GENERATION FUNCTION WITH TIMER
-def generate_data(save_path, num_samples=500, N=25, dt=0.01, use_multiprocessing=False):
+def generate_data(save_path, num_samples=500, N=100, dt=0.01, use_multiprocessing=False):
     """
     Generates random data for a double pendulum robot's state (positions and velocities),
     computes corresponding labels, and saves them as a torch dataset.
@@ -136,8 +136,12 @@ def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
 
     nn_model = l4c_model(state)
     
+    # Apply sigmoid activation to map logits to probabilities
+    sigmoid_output = 1 / (1 + exp(-nn_model))  # Sigmoid function
+    binary_output = if_else(sigmoid_output >= 0.5, 1.0, 0.0)  # Threshold to produce 0 or 1
+
     # Create the CasADi function
-    nn_func = Function('nn_func', [state], [nn_model])  # CasADi function
+    nn_func = Function('nn_func', [state], [binary_output])  # CasADi function
     
     return nn_func
 
@@ -185,7 +189,7 @@ def train_model(dataset_path, model_save_dir):
     model.to(device)
     
     # Train the model for a number of epochs
-    num_epochs = 30
+    num_epochs = 150
     for epoch in range(num_epochs):
         model.train()
         total_loss = 0
@@ -248,8 +252,8 @@ if __name__ == "__main__":
     os.makedirs(model_save_dir, exist_ok=True)
     
     # Parameters for data generation
-    num_samples = 100  # Number of samples to generate
-    N = 25              # Parameter for BwRS computation
+    num_samples = 1000  # Number of samples to generate
+    N = 10              # Parameter for BwRS computation
     dt = 0.01           # Time step for simulation
     
     # Flag to enable multiprocessing (True or False)

@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from adam.casadi.computations import KinDynComputations
@@ -5,6 +6,7 @@ import casadi as cs
 from time import time as clock
 from time import sleep
 from termcolor import colored
+from trainGIAN import create_casadi_function
 
 import orc.utils.plot_utils as plut
 from example_robot_data.robots_loader import load
@@ -34,7 +36,7 @@ SPHERE_RGBA = np.array([1, 0, 0, 1.])
 # - INCREASING THE MAX NUMBER OF ITERATIONS OF THE SOLVER
 DO_WARM_START = True
 SOLVER_TOLERANCE = 1e-4
-SOLVER_MAX_ITER = 3
+SOLVER_MAX_ITER = 30
 
 DO_PLOTS = True
 SIMULATOR = "pinocchio" #"mujoco" or "pinocchio" or "ideal"
@@ -50,14 +52,13 @@ q0 = np.array([-np.pi, 0 ])  # initial joint configuration
 dq0= np.zeros(nq)  # initial joint velocities
 
 dt = 0.010 # time step MPC
-N = int(N_sim/2)  # time horizon MPC
+N = 80 #int(N_sim/10)  # time horizon MPC
 q_des = np.zeros(nq)
 w_p = 1e2   # position weight
-w_v = 1e-6  # velocity weight
-w_a = 1e-6  # acceleration weight
+w_v = 1e-8  # velocity weight
+w_a = 1e-2  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
 USE_TERMINAL_CONSTRAINT = 1
-
 
 if(SIMULATOR=="mujoco"):
     from orc.utils.mujoco_simulator import MujocoSimulator
@@ -109,6 +110,17 @@ print('lbx',lbx)
 print('ubx',ubx)
 print('tau_min',tau_min)
 print('tau_max',tau_max)
+
+
+# LOAD THE NN AND TRANSFORM IT IN A CASADI FUNCTION
+A3_dir = os.path.dirname(os.path.abspath(__file__))
+model_dir = os.path.join(A3_dir, "nn_models")
+input_size = 4  # Adjust this to match your neural network's input size
+
+# Load the CasADi function
+back_reach_set_fun = create_casadi_function(robot_name="double_pendulum", NN_DIR=model_dir, input_size=input_size)
+
+
 # create all the decision variables
 X, U = [], []
 X += [opti.variable(nx)] # do not apply pos/vel bounds on initial state
@@ -130,6 +142,9 @@ for k in range(N):
     # print("Add dynamics constraints")
     opti.subject_to(X[k+1] == X[k] + dt * f(X[k], U[k]))
 
+    # print("Add physical constraints")
+    opti.subject_to(X[k][0] <= 0.2)
+
     # print("Add torque constraints")
     opti.subject_to( opti.bounded(tau_min, inv_dyn(X[k], U[k]), tau_max))
 
@@ -137,7 +152,8 @@ for k in range(N):
 cost += w_final_v * X[-1][nq:].T @ X[-1][nq:]
 
 if(USE_TERMINAL_CONSTRAINT):
-    opti.subject_to(X[-1][nq:] == 0.0)
+    #opti.subject_to(X[-1][nq:] == 0.0)
+    opti.subject_to(back_reach_set_fun(X[-1]) == 1.0)
 
 opti.minimize(cost)
 
@@ -201,12 +217,11 @@ for i in range(N_sim):
 
     print("Comput. time: %.3f s"%(end_time-start_time), 
           "Iters: %3d"%sol.stats()['iter_count'], 
-          "Tracking err: %.3f"%np.linalg.norm(q_des-x[:nq]))
+          "Tracking err: %.3f"%np.linalg.norm(q_des - x[:nq]))
     
     tau = inv_dyn(sol.value(X[0]), sol.value(U[0])).toarray().squeeze()
 
     # Store all the data
-
     data[i][0] = x[0] # joint 1 coord
     data[i][1] = x[1] # joint 2 coord
     data[i][2] = x[2] # joint 1 vel
@@ -228,12 +243,14 @@ for i in range(N_sim):
         # use state predicted by the MPC as next state
         x = sol.value(X[1])
         simu.display(x[:nq])
-        
     
     if( np.any(x[:nq] > qMax)):
         print(colored("\nUPPER POSITION LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]>qMax)[0])
     if( np.any(x[:nq] < qMin)):
         print(colored("\nLOWER POSITION LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]<qMin)[0])
+
+    if( np.any(x[0] >= 0.2)):
+        print(colored("\nIMPACT DETECTED", "red"))
 
     if( np.any(x[nq:] > vMax)):
         print(colored("\nUPPER VELOCITY LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]>qMax)[0])

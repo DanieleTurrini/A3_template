@@ -212,8 +212,8 @@ for i in range(N_sim):
     data[i][3] = x[3] # joint 2 vel
     data[i][4] = tau[0] #sol.value(U[1][0]) # joint 1 torque
     data[i][5] = tau[1] #sol.value(U[1][1]) # joint 2 torque
-    data[i][6] = sol.value(U[1][0]) # joint 1 torque
-    data[i][7] = sol.value(U[1][1]) # joint 2 torque
+    data[i][6] = sol.value(U[0][0]) # joint 1 torque
+    data[i][7] = sol.value(U[0][1]) # joint 2 torque
 
     if(SIMULATOR=="mujoco"):
         # do a proper simulation with Mujoco

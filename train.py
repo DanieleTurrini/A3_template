@@ -1,98 +1,72 @@
-import torch
-from torch.utils.data import DataLoader, TensorDataset, random_split
-import torch.optim as optim
-import numpy as np
+from casadi import DM,Function, exp, if_else
+import os
 from neural_network import NeuralNetwork
 import torch.nn as nn
-import os
+import math
 
-# Load data
-data = np.load("/Users/danieleturrini/orc/A3_template/dataset/training_data.npz")
-states = torch.tensor(data['states'], dtype=torch.float32)
-labels = torch.tensor(data['labels'], dtype=torch.float32).unsqueeze(1)
+# CREATE CASADI FUNCTION FROM NEURAL NETWORK
+def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
+    """
+    Creates a CasADi function for the trained neural network using L4CasADi.
+    
+    Parameters:
+    - robot_name: The name of the robot model
+    - NN_DIR: Directory containing the trained neural network model (.pt file)
+    - input_size: The size of the input to the neural network
+    - load_weights: Boolean flag to load weights from the `.pt` file (default: True)
+    
+    Returns:
+    - The CasADi function of the trained neural network
+    """
+    from casadi import MX, Function
+    import l4casadi as l4c
+    import torch
 
-# for i in range(len(states)):
-#     print(states[i,:],labels[i,:])
+    print("Initializing L4CasADi Model...")
 
-# Split data into training and testing sets
-dataset = TensorDataset(states, labels)
-dataset_size = len(dataset)
-train_size = int(0.8 * dataset_size)  # 80% for training
-test_size = dataset_size - train_size  # Remaining 20% for testing
+    # if load_weights is True, we load the neural-network weights from a ".pt" file
+    if load_weights:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        nn_name = os.path.join(NN_DIR, 'model.pt')
+        nn_data = torch.load(nn_name, map_location=device)
+        model = NeuralNetwork(input_size=input_size, hidden_size=128, output_size=1, activation=nn.Tanh())
+        model.load_state_dict(nn_data['model'])  # Load the trained weights
 
-# Randomly split the dataset
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    state = MX.sym("x", input_size)  # Define CasADi symbolic variable for the state
+    print(f"State shape: {state.shape}")
 
-# Create DataLoader for training and testing
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    # Initialize L4CasADi wrapper
+    l4c_model = l4c.L4CasADi(model, 
+                             device='cuda' if torch.cuda.is_available() else 'cpu',
+                             name=f'{robot_name}_model', 
+                             build_dir=f'{NN_DIR}nn_{robot_name}')
+    
+    print(f"Input to model: {l4c_model(state).shape}")
 
-# Verify the splits
-print(f"Training set size: {len(train_dataset)} samples")
-print(f"Testing set size: {len(test_dataset)} samples")
+    nn_model = l4c_model(state)
+    
+    # Apply sigmoid activation to map logits to probabilities
+    sigmoid_output = 1 / (1 + exp(-nn_model))  # Sigmoid function
+    binary_output = if_else(sigmoid_output >= 0.5, 1.0, 0.0)  # Threshold to produce 0 or 1
 
-# Define the model
-input_size = 4  # 2 joint positions + 2 joint velocities
-hidden_size = 64  # Adjust as needed
-output_size = 1  # Binary classification (1 or 0)
+    # Create the CasADi function
+    nn_func = Function('nn_func', [state], [binary_output])  # CasADi function
+    
+    return nn_func
 
-model = NeuralNetwork(input_size=input_size, hidden_size=hidden_size, output_size=output_size, activation=nn.Tanh())
+# Define necessary parameters
+model_dir = "/Users/danieleturrini/orc/A3_template/nn_models"  # Folder where model.pt is saved
+input_size = 4  # Adjust this to match your neural network's input size
+robot_name = "double_pendulum"
 
-# TRAIN
-# Loss function and optimizer
-criterion = nn.BCEWithLogitsLoss()  # For binary classification
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+# Load the CasADi function
+# Load the CasADi function
+nn_func = create_casadi_function(robot_name="double_pendulum", NN_DIR=model_dir, input_size=input_size)
 
-# Training loop
-num_epochs = 30
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model.to(device)
+# Test the function with a sample input
+sample_input = DM([-0.5, -0.5, 10.0, 0.0])  # Example test input
+probability_output = nn_func(sample_input)
 
-for epoch in range(num_epochs):
-    model.train()
-    total_loss = 0
-    for X_batch, y_batch in train_loader:
-        X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+print("Sample Input:", sample_input)
+print("Probability Output:", probability_output)
 
-        # Forward pass
-        outputs = model(X_batch)
-        loss = criterion(outputs, y_batch)
-
-        # Backward pass and optimization
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-
-    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {total_loss/len(train_loader):.4f}")
-
-# VALIDATION
-# Evaluate on the test set
-model.eval()
-with torch.no_grad():
-    correct = 0
-    total = 0
-    for X_batch, y_batch in test_loader:
-        X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-        outputs = torch.sigmoid(model(X_batch))
-        predictions = (outputs > 0.5).float()
-        total += y_batch.size(0)
-        correct += (predictions == y_batch).sum().item()
-
-    print(f"Test Accuracy: {correct / total:.4f}")
-
-# EXPORT THE MODEL WITH L4CASADI
-# Save the model weights
-NN_DIR = "/Users/danieleturrini/orc/A3_template/nn_models/"  # Directory to save the model
-if not os.path.exists(NN_DIR):
-    print("directory not found - creating new directory")
-torch.save({'model': model.state_dict()}, f"{NN_DIR}model.pt")
-
-# Export the model to CasADi
-robot_name = "doublependulum"
-load_weights = True
-model.create_casadi_function(robot_name, NN_DIR, input_size, load_weights)
-
-# The CasADi function can now be used in optimization problems
-print("Neural network exported successfully.")
