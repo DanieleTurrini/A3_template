@@ -1,64 +1,37 @@
 import torch
 import torch.nn as nn
-  
+from casadi import MX, Function
+import l4casadi as l4c
+
 class NeuralNetwork(nn.Module):
     """ A simple feedforward neural network. """
-    def __init__(self, input_size, hidden_size, output_size, activation=nn.Tanh(), ub=None):
-        super().__init__()
+    def __init__(self, input_size, hidden_size, output_size, activation):
+        super(NeuralNetwork, self).__init__()
         self.linear_stack = nn.Sequential(
             nn.Linear(input_size, hidden_size),
             activation,
-            nn.Linear(hidden_size, hidden_size),
-            activation,
-            nn.Linear(hidden_size, output_size),
-            activation,
+            nn.Linear(hidden_size, output_size)
         )
-
-        """ input_size: Number of input features.
-            hidden_size: Number of units in the hidden layers.
-            output_size: Number of output features.
-            activation: Activation function applied after each linear transformation (default is nn.Tanh).
-            ub: Upper bound to scale the network's output (default is 1)."""
-
-        self.ub = ub if ub is not None else 1 # upper bound of the output layer
-        self.initialize_weights()
+        # Assuming ub is a multiplier, it's better to initialize ub as a parameter and put it on the same device.
+        self.ub = torch.ones((output_size, 1))  # Default value, assuming it's a fixed multiplier for the output
 
     def forward(self, x):
-        out = self.linear_stack(x) * self.ub
+        # Move self.ub to the same device as x
+        self.ub = self.ub.to(x.device)
+        
+        # Ensure input has the correct shape
+        if x.ndimension() == 1:
+            x = x.view(1, -1)  # Reshape for a single sample
+        elif x.ndimension() == 2 and x.shape[0] == 4:
+            x = x.T  # Reshaping (4, 1) to (1, 4)
+
+        # Forward pass
+        out = self.linear_stack(x) * self.ub  # Multiply with ub (now on the same device)
         return out
-   
+
     def initialize_weights(self):
+        """ Initialize the weights of each layer using Xavier normal initialization. """
         for layer in self.linear_stack:
             if isinstance(layer, nn.Linear):
                 nn.init.xavier_normal_(layer.weight)
                 nn.init.zeros_(layer.bias) 
-
-    def create_casadi_function(self, robot_name, NN_DIR, input_size, load_weights):
-        from casadi import MX, Function
-        import l4casadi as l4c
-        import torch
-
-        print(self.linear_stack)
-
-        # if load_weights is True, we load the neural-network weights from a ".pt" file
-        if(load_weights):
-            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            nn_name = f'{NN_DIR}model.pt'
-            nn_data = torch.load(nn_name, map_location=device)
-            self.load_state_dict(nn_data['model'])
-
-        state = MX.sym("x",input_size)
-         
-        print("state:\n",state)
-        print(f"State shape: {state.shape}")
-
-        self.l4c_model = l4c.L4CasADi(self,
-                                      device='cuda' if torch.cuda.is_available() else 'cpu',
-                                      name=f'{robot_name}_model',
-                                      build_dir=f'{NN_DIR}nn_{robot_name}')
-        
-        print(f"Input to model: {self.l4c_model(state).shape}")
-
-        self.nn_model = self.l4c_model(state)
-        # This is the function that you can use in a casadi problem
-        self.nn_func = Function('nn_func', [state], [self.nn_model])
