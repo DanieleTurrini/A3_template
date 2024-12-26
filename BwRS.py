@@ -83,14 +83,14 @@ def is_in_BwRS (robot, x_init, N, time_step, X_bounds, U_bounds):
         sol = opti.solve()
         #per fare una prova plotto direttamente l'ultimo stato che il solver ha calcolato:
         #print(sol.value(X[-1]))
-        print("1")
+        #print("1")
         #return True  # Feasible solution
         return 1
     except:
         sol = opti.debug
         #per fare una prova plotto direttamente l'ultimo stato che il solver ha calcolato:
         #print(sol.value(X[-1]))
-        print("0")
+        #print("0")
         """X_values = np.array([sol.value(X[i]) for i in range(len(X))])
         U_values = np.array([sol.value(U[i]) for i in range(len(U))])
 
