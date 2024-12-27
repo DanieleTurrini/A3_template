@@ -28,7 +28,7 @@ def compute_label(state, robot, N, dt, q_bound, tau_bound):
     return is_in_BwRS(robot, state, N, dt, q_bound, tau_bound)
 
 # DATA GENERATION FUNCTION WITH TIMER
-def generate_data(save_path, num_samples=500, N=100, dt=0.01, use_multiprocessing=False):
+def generate_data(save_path, num_samples=500, N=25, dt=0.01, use_multiprocessing=False):
     """
     Generates random data for a double pendulum robot's state (positions and velocities),
     computes corresponding labels, and saves them as a torch dataset.
@@ -131,11 +131,11 @@ def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
                              device='cuda' if torch.cuda.is_available() else 'cpu',
                              name=f'{robot_name}_model', 
                              build_dir=f'{NN_DIR}nn_{robot_name}')
-    
+
     print(f"Input to model: {l4c_model(state).shape}")
 
     nn_model = l4c_model(state)
-    
+
     # Apply sigmoid activation to map logits to probabilities
     sigmoid_output = 1 / (1 + exp(-nn_model))  # Sigmoid function
     binary_output = if_else(sigmoid_output >= 0.5, 1.0, 0.0)  # Threshold to produce 0 or 1
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     
     # Parameters for data generation
     num_samples = 1000  # Number of samples to generate
-    N = 10              # Parameter for BwRS computation
+    N = 25              # Parameter for BwRS computation
     dt = 0.01           # Time step for simulation
     
     # Flag to enable multiprocessing (True or False)

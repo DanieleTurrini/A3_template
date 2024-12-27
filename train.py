@@ -68,5 +68,5 @@ sample_input = DM([-0.5, -0.5, 10.0, 0.0])  # Example test input
 probability_output = nn_func(sample_input)
 
 print("Sample Input:", sample_input)
-print("Probability Output:", probability_output)
+print("Probability Output:", nn_func(sample_input))
 

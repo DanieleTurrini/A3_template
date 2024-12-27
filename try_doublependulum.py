@@ -35,8 +35,8 @@ SPHERE_RGBA = np.array([1, 0, 0, 1.])
 # - INCREASING THE ACCELERATION WEIGHT IN THE COST
 # - INCREASING THE MAX NUMBER OF ITERATIONS OF THE SOLVER
 DO_WARM_START = True
-SOLVER_TOLERANCE = 1e-4
-SOLVER_MAX_ITER = 30
+SOLVER_TOLERANCE = 1e-6
+SOLVER_MAX_ITER = 50
 
 DO_PLOTS = True
 SIMULATOR = "pinocchio" #"mujoco" or "pinocchio" or "ideal"
@@ -48,15 +48,15 @@ qMax = -qMin#POS_BOUNDS_SCALING_FACTOR * robot.model.upperPositionLimit
 vMax = np.array([10.0,10.0])#VEL_BOUNDS_SCALING_FACTOR * robot.model.velocityLimit
 dt_sim = 0.002
 N_sim = 200
-q0 = np.array([-np.pi, 0 ])  # initial joint configuration
+q0 = np.array([0, 0])  # initial joint configuration
 dq0= np.zeros(nq)  # initial joint velocities
 
 dt = 0.010 # time step MPC
-N = 80 #int(N_sim/10)  # time horizon MPC
-q_des = np.zeros(nq)
+N = 50 #int(N_sim/10)  # time horizon MPC
+q_des = np.array([-np.pi, 0])
 w_p = 1e2   # position weight
 w_v = 1e-8  # velocity weight
-w_a = 1e-2  # acceleration weight
+w_a = 1e-8  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
 USE_TERMINAL_CONSTRAINT = 1
 
@@ -143,7 +143,7 @@ for k in range(N):
     opti.subject_to(X[k+1] == X[k] + dt * f(X[k], U[k]))
 
     # print("Add physical constraints")
-    opti.subject_to(X[k][0] <= 0.2)
+    opti.subject_to(X[k][0] >= -3.4)
 
     # print("Add torque constraints")
     opti.subject_to( opti.bounded(tau_min, inv_dyn(X[k], U[k]), tau_max))
@@ -153,7 +153,12 @@ cost += w_final_v * X[-1][nq:].T @ X[-1][nq:]
 
 if(USE_TERMINAL_CONSTRAINT):
     #opti.subject_to(X[-1][nq:] == 0.0)
-    opti.subject_to(back_reach_set_fun(X[-1]) == 1.0)
+    opti.subject_to(back_reach_set_fun(X[-1]) == 0.0)
+
+print("Constraints added to the optimization:")
+for constraint in cs.vertsplit(opti.g, 1):  # List all constraints
+    print(constraint)
+
 
 opti.minimize(cost)
 
@@ -219,6 +224,13 @@ for i in range(N_sim):
           "Iters: %3d"%sol.stats()['iter_count'], 
           "Tracking err: %.3f"%np.linalg.norm(q_des - x[:nq]))
     
+    #print("TERMINAL CONSTRAINT LABELS: ",back_reach_set_fun(X[-1]))
+
+    if USE_TERMINAL_CONSTRAINT:
+        final_state = sol.value(X[-1])  # Extract the numerical value of X[-1] from the solution
+        terminal_value = back_reach_set_fun(final_state)  # Evaluate the neural network output
+        print("TERMINAL CONSTRAINT VALUE: ", terminal_value)
+
     tau = inv_dyn(sol.value(X[0]), sol.value(U[0])).toarray().squeeze()
 
     # Store all the data
@@ -249,7 +261,7 @@ for i in range(N_sim):
     if( np.any(x[:nq] < qMin)):
         print(colored("\nLOWER POSITION LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]<qMin)[0])
 
-    if( np.any(x[0] >= 0.2)):
+    if( np.any(x[0] <= -3.4)):
         print(colored("\nIMPACT DETECTED", "red"))
 
     if( np.any(x[nq:] > vMax)):
@@ -263,7 +275,6 @@ for i in range(N_sim):
         print(colored("\nLOWER TORQUE LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]<qMin)[0])
 
 # Plots 
-
 # plot joint trajectories
 if(DO_PLOTS):
     time = np.arange(0, (N_sim)*dt_sim, dt_sim)

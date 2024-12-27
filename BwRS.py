@@ -59,7 +59,7 @@ def is_in_BwRS (robot, x_init, N, time_step, X_bounds, U_bounds):
         # Add torque constraints
         opti.subject_to( opti.bounded(tau_min, inv_dyn(X[k], U[k]), tau_max))
         # Add a joint constrain on only joint 1
-        opti.subject_to(X[k][0] <= 0.2)
+        opti.subject_to(X[k][0] >= -3.4)
     # Add initial condition of the state
     opti.subject_to(X[0] == param_x_init)
     # Constrain the final set to be a stationary point with zero velocity:
