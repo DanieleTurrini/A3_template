@@ -35,8 +35,8 @@ SPHERE_RGBA = np.array([1, 0, 0, 1.])
 # - INCREASING THE ACCELERATION WEIGHT IN THE COST
 # - INCREASING THE MAX NUMBER OF ITERATIONS OF THE SOLVER
 DO_WARM_START = True
-SOLVER_TOLERANCE = 1e-6
-SOLVER_MAX_ITER = 3
+SOLVER_TOLERANCE = 1e-4
+SOLVER_MAX_ITER = 40
 
 DO_PLOTS = True
 SIMULATOR = "pinocchio" #"mujoco" or "pinocchio" or "ideal"
@@ -59,7 +59,7 @@ w_v = 1e-8  # velocity weight
 w_a = 1e-8  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
 w_t = 1e2
-USE_TERMINAL_CONSTRAINT = 0
+USE_TERMINAL_CONSTRAINT = 1
 
 if(SIMULATOR=="mujoco"):
     from orc.utils.mujoco_simulator import MujocoSimulator
@@ -72,12 +72,12 @@ else:
     simu.init(q0, dq0)
     simu.display(q0)
     
-
 print("Create optimization parameters")
 ''' The parameters P contain:
     - the initial state (first 12 values)
     - the target configuration (last 6 values)
 '''
+
 opti = cs.Opti()
 param_x_init = opti.parameter(nx)
 param_q_des = opti.parameter(nq)
@@ -139,8 +139,6 @@ for k in range(N):
     cost += w_v * X[k][nq:].T @ X[k][nq:]
     cost += w_a * U[k].T @ U[k]
 
-
-
     # print("Add dynamics constraints")
     opti.subject_to(X[k+1] == X[k] + dt * f(X[k], U[k]))
 
@@ -152,11 +150,10 @@ for k in range(N):
 
 # add the final cost
 cost += w_final_v * X[-1][nq:].T @ X[-1][nq:]
-cost += w_t *(1-back_reach_set_fun(X[-1]))
 
 if(USE_TERMINAL_CONSTRAINT):
-    opti.subject_to(X[-1][nq:] == 0.0)
-    #opti.subject_to(back_reach_set_fun(X[-1]) >= 0.5)
+    #opti.subject_to(X[-1][nq:] == 0.0)
+    opti.subject_to(back_reach_set_fun(X[-1]) >= 0.5)
 
 # print("Constraints added to the optimization:")
 # for constraint in cs.vertsplit(opti.g, 1):  # List all constraints
@@ -173,7 +170,9 @@ opts = {
     "ipopt.compl_inf_tol": SOLVER_TOLERANCE,
     "print_time": 0,                # print information about execution time
     "detect_simple_bounds": True,
-    "ipopt.max_iter": 1000
+    "ipopt.nlp_scaling_method": "gradient-based",
+    "ipopt.max_iter": 1000,
+    "ipopt.hessian_approximation": "limited-memory" 
 }
 opti.solver("ipopt", opts)
 

@@ -4,8 +4,57 @@ import os
 from neural_network import NeuralNetwork
 import torch.nn as nn
 import math
-from A3_template.train import create_casadi_function
+#from A3_template.train import create_casadi_function
 import numpy as np
+
+# CREATE CASADI FUNCTION FROM NEURAL NETWORK
+def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
+    """
+    Creates a CasADi function for the trained neural network using L4CasADi.
+    
+    Parameters:
+    - robot_name: The name of the robot model
+    - NN_DIR: Directory containing the trained neural network model (.pt file)
+    - input_size: The size of the input to the neural network
+    - load_weights: Boolean flag to load weights from the `.pt` file (default: True)
+    
+    Returns:
+    - The CasADi function of the trained neural network
+    """
+    from casadi import MX, Function
+    import l4casadi as l4c
+    import torch
+
+    print("Initializing L4CasADi Model...")
+
+    # if load_weights is True, we load the neural-network weights from a ".pt" file
+    if load_weights:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        nn_name = os.path.join(NN_DIR, 'model.pt')
+        nn_data = torch.load(nn_name, map_location=device)
+        model = NeuralNetwork(input_size=input_size, hidden_size=128, output_size=1, activation=nn.Tanh())
+        model.load_state_dict(nn_data['model'])  # Load the trained weights
+
+    state = MX.sym("x", input_size)  # Define CasADi symbolic variable for the state
+    print(f"State shape: {state.shape}")
+
+    # Initialize L4CasADi wrapper
+    l4c_model = l4c.L4CasADi(model, 
+                             device='cuda' if torch.cuda.is_available() else 'cpu',
+                             name=f'{robot_name}_model', 
+                             build_dir=f'{NN_DIR}nn_{robot_name}')
+
+    print(f"Input to model: {l4c_model(state).shape}")
+
+    nn_model = l4c_model(state)
+
+    # Apply sigmoid activation to map logits to probabilities
+    sigmoid_output = 1 / (1 + exp(-nn_model))  # Sigmoid function
+
+    # Create the CasADi function
+    nn_func = Function('nn_func', [state], [sigmoid_output])  # CasADi function
+    
+    return nn_func
 
 # LOAD THE NN AND TRANSFORM IT IN A CASADI FUNCTION
 A3_dir = os.path.dirname(os.path.abspath(__file__))
@@ -24,15 +73,21 @@ J = cs.jacobian(back_reach_set_fun(dummy_input), dummy_input)
 # Create a CasADi function to evaluate the Jacobian numerically
 J_func = cs.Function('J_func', [dummy_input], [J])
 
+# Compute the Hessian of the neural network function
+H, grad = cs.hessian(back_reach_set_fun(dummy_input), dummy_input)
+
+# Create a CasADi function to evaluate the Hessian numerically
+H_func = cs.Function('H_func', [dummy_input], [H])
+
 # Evaluate the Jacobian at a specific input
 numerical_input = DM([0.0, 0.0, 25.0, 50.0])
 J_evaluated = J_func(numerical_input)
+H_evaluated = H_func(numerical_input)
 
 print("Jacobian at input:", J_evaluated)
+print("Hessian at input:", H_evaluated)
 
-# Evaluate the function itself at the same input
-output = back_reach_set_fun(numerical_input)
-print("Function output:", output)
+print("output probability ",back_reach_set_fun(numerical_input))
 
 # opti = cs.Opti()
 
