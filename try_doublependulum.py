@@ -6,7 +6,7 @@ import casadi as cs
 from time import time as clock
 from time import sleep
 from termcolor import colored
-from trainGIAN import create_casadi_function
+from A3_template.train import create_casadi_function
 
 import orc.utils.plot_utils as plut
 from example_robot_data.robots_loader import load
@@ -36,7 +36,7 @@ SPHERE_RGBA = np.array([1, 0, 0, 1.])
 # - INCREASING THE MAX NUMBER OF ITERATIONS OF THE SOLVER
 DO_WARM_START = True
 SOLVER_TOLERANCE = 1e-6
-SOLVER_MAX_ITER = 50
+SOLVER_MAX_ITER = 3
 
 DO_PLOTS = True
 SIMULATOR = "pinocchio" #"mujoco" or "pinocchio" or "ideal"
@@ -111,7 +111,6 @@ print('ubx',ubx)
 print('tau_min',tau_min)
 print('tau_max',tau_max)
 
-
 # LOAD THE NN AND TRANSFORM IT IN A CASADI FUNCTION
 A3_dir = os.path.dirname(os.path.abspath(__file__))
 model_dir = os.path.join(A3_dir, "nn_models")
@@ -120,20 +119,20 @@ input_size = 4  # Adjust this to match your neural network's input size
 # Load the CasADi function
 back_reach_set_fun = create_casadi_function(robot_name="double_pendulum", NN_DIR=model_dir, input_size=input_size)
 
-
 # create all the decision variables
 X, U = [], []
 X += [opti.variable(nx)] # do not apply pos/vel bounds on initial state
 for k in range(1, N+1): 
     X += [opti.variable(nx)]
-    opti.subject_to( opti.bounded(lbx, X[-1], ubx) )
+    opti.subject_to(opti.bounded(lbx, X[-1], ubx))
 for k in range(N): 
     U += [opti.variable(nq)]
-    opti.subject_to( opti.bounded(tau_min, U[-1], tau_max))
+    opti.subject_to(opti.bounded(tau_min, U[-1], tau_max))
 
 print("Add initial conditions")
 opti.subject_to(X[0] == param_x_init)
-for k in range(N):     
+for k in range(N):   
+
     # print("Compute cost function")
     cost += w_p * (X[k][:nq] - param_q_des).T @ (X[k][:nq] - param_q_des)
     cost += w_v * X[k][nq:].T @ X[k][nq:]
@@ -152,13 +151,12 @@ for k in range(N):
 cost += w_final_v * X[-1][nq:].T @ X[-1][nq:]
 
 if(USE_TERMINAL_CONSTRAINT):
-    #opti.subject_to(X[-1][nq:] == 0.0)
-    opti.subject_to(back_reach_set_fun(X[-1]) == 0.0)
+    # opti.subject_to(X[-1][nq:] == 0.0)
+    opti.subject_to(back_reach_set_fun(X[-1]) >= 0.5)
 
-print("Constraints added to the optimization:")
-for constraint in cs.vertsplit(opti.g, 1):  # List all constraints
-    print(constraint)
-
+# print("Constraints added to the optimization:")
+# for constraint in cs.vertsplit(opti.g, 1):  # List all constraints
+#     print(constraint)
 
 opti.minimize(cost)
 
@@ -190,6 +188,10 @@ opti.set_value(param_x_init, x)
 #    print(f"Constraint {i}: {constraint}")
 
 sol = opti.solve()
+
+print("Last state:", opti.debug.value(X[-1]))
+print("Last control:", opti.debug.value(U[-1]))
+
 opts["ipopt.max_iter"] = SOLVER_MAX_ITER
 opti.solver("ipopt", opts)
 
@@ -210,7 +212,7 @@ for i in range(N_sim):
         # initialize dual variables
         lam_g0 = sol.value(opti.lam_g)
         opti.set_initial(opti.lam_g, lam_g0)
-    
+
     print("Time step", i, "State", x)
     opti.set_value(param_x_init, x)
     try:
@@ -223,8 +225,6 @@ for i in range(N_sim):
     print("Comput. time: %.3f s"%(end_time-start_time), 
           "Iters: %3d"%sol.stats()['iter_count'], 
           "Tracking err: %.3f"%np.linalg.norm(q_des - x[:nq]))
-    
-    #print("TERMINAL CONSTRAINT LABELS: ",back_reach_set_fun(X[-1]))
 
     if USE_TERMINAL_CONSTRAINT:
         final_state = sol.value(X[-1])  # Extract the numerical value of X[-1] from the solution
@@ -255,7 +255,7 @@ for i in range(N_sim):
         # use state predicted by the MPC as next state
         x = sol.value(X[1])
         simu.display(x[:nq])
-    
+
     if( np.any(x[:nq] > qMax)):
         print(colored("\nUPPER POSITION LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]>qMax)[0])
     if( np.any(x[:nq] < qMin)):
