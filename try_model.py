@@ -25,7 +25,7 @@ J = cs.jacobian(back_reach_set_fun(dummy_input), dummy_input)
 J_func = cs.Function('J_func', [dummy_input], [J])
 
 # Evaluate the Jacobian at a specific input
-numerical_input = DM([-3.4, 0.0, 0.0, 0.0])
+numerical_input = DM([0.0, 0.0, 25.0, 50.0])
 J_evaluated = J_func(numerical_input)
 
 print("Jacobian at input:", J_evaluated)
@@ -34,27 +34,27 @@ print("Jacobian at input:", J_evaluated)
 output = back_reach_set_fun(numerical_input)
 print("Function output:", output)
 
-opti = cs.Opti()
+# opti = cs.Opti()
 
-opti.solver('ipopt', {'hessian_approximation': 'limited-memory',
-                      'print_level': 5})
+# opti.solver('ipopt', {'hessian_approximation': 'limited-memory',
+#                       'print_level': 5})
 
-x = opti.variable(4)
+# x = opti.variable(4)
 
-opti.set_initial(x, DM([0, 0, 0, 0])) 
+# opti.set_initial(x, DM([0, 0, 0, 0])) 
 
-opti.minimize(-(x[2]+x[3]) + 10 * back_reach_set_fun(x))
-# opti.subject_to(back_reach_set_fun(x) >= 0.5)
+# opti.minimize(-(x[2]+x[3]) + 10 * back_reach_set_fun(x))
+# # opti.subject_to(back_reach_set_fun(x) >= 0.5)
 
-opti.solver('ipopt')
+# opti.solver('ipopt')
 
-try:
-    sol = opti.solve()
-    print("Solution x:", sol.value(x))
-    print("Constraint value:", back_reach_set_fun(sol.value(x)))
+# try:
+#     sol = opti.solve()
+#     print("Solution x:", sol.value(x))
+#     print("Constraint value:", back_reach_set_fun(sol.value(x)))
     
-except RuntimeError as e:
-    print("Solver failed:", e)
-    print("Debugging initial state...")
-    print("Initial x:", opti.debug.value(x))
-    print("Initial constraint value:", opti.debug.value(back_reach_set_fun(x)))
+# except RuntimeError as e:
+#     print("Solver failed:", e)
+#     print("Debugging initial state...")
+#     print("Initial x:", opti.debug.value(x))
+#     print("Initial constraint value:", opti.debug.value(back_reach_set_fun(x)))

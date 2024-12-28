@@ -58,7 +58,8 @@ w_p = 1e2   # position weight
 w_v = 1e-8  # velocity weight
 w_a = 1e-8  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
-USE_TERMINAL_CONSTRAINT = 1
+w_t = 1e2
+USE_TERMINAL_CONSTRAINT = 0
 
 if(SIMULATOR=="mujoco"):
     from orc.utils.mujoco_simulator import MujocoSimulator
@@ -138,6 +139,8 @@ for k in range(N):
     cost += w_v * X[k][nq:].T @ X[k][nq:]
     cost += w_a * U[k].T @ U[k]
 
+
+
     # print("Add dynamics constraints")
     opti.subject_to(X[k+1] == X[k] + dt * f(X[k], U[k]))
 
@@ -149,10 +152,11 @@ for k in range(N):
 
 # add the final cost
 cost += w_final_v * X[-1][nq:].T @ X[-1][nq:]
+cost += w_t *(1-back_reach_set_fun(X[-1]))
 
 if(USE_TERMINAL_CONSTRAINT):
-    # opti.subject_to(X[-1][nq:] == 0.0)
-    opti.subject_to(back_reach_set_fun(X[-1]) >= 0.5)
+    opti.subject_to(X[-1][nq:] == 0.0)
+    #opti.subject_to(back_reach_set_fun(X[-1]) >= 0.5)
 
 # print("Constraints added to the optimization:")
 # for constraint in cs.vertsplit(opti.g, 1):  # List all constraints
