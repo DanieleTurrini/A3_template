@@ -36,7 +36,7 @@ SPHERE_RGBA = np.array([1, 0, 0, 1.])
 # - INCREASING THE MAX NUMBER OF ITERATIONS OF THE SOLVER
 DO_WARM_START = True
 SOLVER_TOLERANCE = 1e-4
-SOLVER_MAX_ITER = 40
+SOLVER_MAX_ITER = 3
 
 DO_PLOTS = True
 SIMULATOR = "pinocchio" #"mujoco" or "pinocchio" or "ideal"
@@ -52,7 +52,7 @@ q0 = np.array([0, 0])  # initial joint configuration
 dq0= np.zeros(nq)  # initial joint velocities
 
 dt = 0.010 # time step MPC
-N = 50 #int(N_sim/10)  # time horizon MPC
+N = 25 #int(N_sim/10)  # time horizon MPC
 q_des = np.array([-np.pi, 0])
 w_p = 1e2   # position weight
 w_v = 1e-8  # velocity weight
@@ -199,6 +199,7 @@ opts["ipopt.max_iter"] = SOLVER_MAX_ITER
 opti.solver("ipopt", opts)
 
 data = np.zeros((N_sim, 8))
+sum_times = 0
 
 print("Start the MPC loop")
 for i in range(N_sim):
@@ -224,6 +225,8 @@ for i in range(N_sim):
         sol = opti.debug
         # print("Convergence failed!")
     end_time = clock()
+
+    sum_times += end_time-start_time
 
     print("Comput. time: %.3f s"%(end_time-start_time), 
           "Iters: %3d"%sol.stats()['iter_count'], 
@@ -276,6 +279,9 @@ for i in range(N_sim):
         print(colored("\nUPPER TORQUE LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]>qMax)[0])
     if( np.any(tau < tau_min)):
         print(colored("\nLOWER TORQUE LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]<qMin)[0])
+
+
+print("Mean Computation time: ", sum_times/N_sim)
 
 # Plots 
 # plot joint trajectories

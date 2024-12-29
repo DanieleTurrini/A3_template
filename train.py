@@ -48,7 +48,7 @@ def generate_data(save_path, num_samples=500, N=25, dt=0.01, use_multiprocessing
         q_limit = 2.0 * np.pi  # Joint position limit
         v_limit = 10.0         # Joint velocity limit
         torque_limit = 10.0    # Torque limit
-        scaling_factor = 0.3   # Scaling factor for torque limits
+        scaling_factor = 0.5   # Scaling factor for torque limits
         
         # State bounds: [theta1, theta2, v1, v2, -theta1, -theta2, -v1, -v2]
         q_bound = [-q_limit, -q_limit, -v_limit, -v_limit, q_limit, q_limit, v_limit, v_limit]
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     
     # Parameters for data generation
     num_samples = 1000  # Number of samples to generate
-    N = 25              # Parameter for BwRS computation
+    N = 100              # Parameter for BwRS computation
     dt = 0.01           # Time step for simulation
     
     # Flag to enable multiprocessing (True or False)
