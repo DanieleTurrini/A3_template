@@ -1,6 +1,6 @@
 #include <l4casadi.hpp>
 
-L4CasADi l4casadi("/Users/danieleturrini/orc/A3_template/nn_modelsnn_double_pendulum", "double_pendulum_model", 4, 1, 1, 1, "cpu", true, true, true, false, true, false);
+L4CasADi l4casadi("/home/gianwsl/OC/orc/A3_template/l4casadi", "double_pendulum_model", 4, 1, 1, 1, "cuda", true, true, true, false, true, false);
 
 #ifdef __cplusplus
 extern "C" {

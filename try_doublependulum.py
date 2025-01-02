@@ -23,10 +23,6 @@ joints_name_list = [s for s in robot.model.names[1:]] # skip the first name beca
 nq = len(joints_name_list)  # number of joints
 nx = 2*nq # size of the state variable
 kinDyn = KinDynComputations(robot.urdf, joints_name_list)
-ADD_SPHERE = 0
-SPHERE_POS = np.array([0.2, -0.10, 0.5])
-SPHERE_SIZE = np.ones(3)*0.1
-SPHERE_RGBA = np.array([1, 0, 0, 1.])
 
 # WITH THIS CONFIGURATION THE SOLVER ENDS UP VIOLATING THE JOINT LIMITS
 # ADDING THE TERMINAL CONSTRAINT FIXES EVERYTHING!
@@ -38,39 +34,44 @@ DO_WARM_START = True
 SOLVER_TOLERANCE = 1e-4
 SOLVER_MAX_ITER = 3
 
-DO_PLOTS = True
-SIMULATOR = "pinocchio" #"mujoco" or "pinocchio" or "ideal"
-POS_BOUNDS_SCALING_FACTOR = 0.2
-VEL_BOUNDS_SCALING_FACTOR = 3.0
-TORQUE_BOUNDS_SCALING_FACTOR = 0.5
-qMin = np.array([-2.0*np.pi,-2.0*np.pi])#POS_BOUNDS_SCALING_FACTOR * robot.model.lowerPositionLimit
-qMax = -qMin#POS_BOUNDS_SCALING_FACTOR * robot.model.upperPositionLimit
-vMax = np.array([10.0,10.0])#VEL_BOUNDS_SCALING_FACTOR * robot.model.velocityLimit
+DO_PLOTS = False
+SIMULATOR = "pinocchio" #"pinocchio" or "ideal"
+VEL_BOUNDS_SCALING_FACTOR = 1.0
+TORQUE_BOUNDS_SCALING_FACTOR = 9.0
+qMin = np.array([-2.0*np.pi,-2.0*np.pi])
+qMax = -qMin
+vMax = np.array([10.0,10.0])*VEL_BOUNDS_SCALING_FACTOR
+vMin = -vMax
+tauMin = np.array([-1.0, -1.0])*TORQUE_BOUNDS_SCALING_FACTOR
+tauMax = -tauMin
+# Definition of a physical constraint that  doesn't allow the double pendulum to go beyond 
+# a certain configuration (in terms of joint angles)
+DELTA = 0.1
+q_lim = np.array([-(np.pi+DELTA),-(0.0+DELTA)])
+
 dt_sim = 0.002
-N_sim = 200
+N_sim = 250
 q0 = np.array([0, 0])  # initial joint configuration
 dq0= np.zeros(nq)  # initial joint velocities
 
 dt = 0.010 # time step MPC
-N = 25 #int(N_sim/10)  # time horizon MPC
+N = 30 #int(N_sim/10)  # time horizon MPC
 q_des = np.array([-np.pi, 0])
 w_p = 1e2   # position weight
 w_v = 1e-8  # velocity weight
 w_a = 1e-8  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
-w_t = 1e2
-USE_TERMINAL_CONSTRAINT = 1
+w_BwRS = 1e5 # backward reachable set weight
+USE_Q_LIM_CONSTRAINT = 1
+USE_TERMINAL_CONSTRAINT = 0
+PROB_TRESHOLD = 0.99
+USE_L4FUNCTION = 1
 
-if(SIMULATOR=="mujoco"):
-    from orc.utils.mujoco_simulator import MujocoSimulator
-    print("Creating simulator...")
-    simu = MujocoSimulator("ur5", dt_sim)
-    simu.set_state(q0, dq0)
-else:
-    r = RobotWrapper(robot.model, robot.collision_model, robot.visual_model)
-    simu = RobotSimulator(conf_doublep, r)
-    simu.init(q0, dq0)
-    simu.display(q0)
+
+r = RobotWrapper(robot.model, robot.collision_model, robot.visual_model)
+simu = RobotSimulator(conf_doublep, r)
+simu.init(q0, dq0)
+simu.display(q0)
     
 print("Create optimization parameters")
 ''' The parameters P contain:
@@ -105,8 +106,8 @@ inv_dyn = cs.Function('inv_dyn', [state, ddq], [tau])
 # pre-compute state and torque bounds
 lbx = qMin.tolist() + (-vMax).tolist()
 ubx = qMax.tolist() + vMax.tolist()
-tau_min = (np.array([-10.0, -10.0])*TORQUE_BOUNDS_SCALING_FACTOR).tolist() #(-robot.model.effortLimit).tolist()
-tau_max = (np.array([10.0, 10.0])*TORQUE_BOUNDS_SCALING_FACTOR).tolist() #robot.model.effortLimit.tolist()
+tau_min = tauMin.tolist()
+tau_max = tauMax.tolist()
 print('lbx',lbx)
 print('ubx',ubx)
 print('tau_min',tau_min)
@@ -142,8 +143,9 @@ for k in range(N):
     # print("Add dynamics constraints")
     opti.subject_to(X[k+1] == X[k] + dt * f(X[k], U[k]))
 
-    # print("Add physical constraints")
-    opti.subject_to(X[k][0] >= -3.4)
+    # Add physical constraints
+    if(USE_Q_LIM_CONSTRAINT):
+        opti.subject_to(X[k][:nq] >= q_lim)
 
     # print("Add torque constraints")
     opti.subject_to( opti.bounded(tau_min, inv_dyn(X[k], U[k]), tau_max))
@@ -152,8 +154,10 @@ for k in range(N):
 cost += w_final_v * X[-1][nq:].T @ X[-1][nq:]
 
 if(USE_TERMINAL_CONSTRAINT):
-    #opti.subject_to(X[-1][nq:] == 0.0)
-    opti.subject_to(back_reach_set_fun(X[-1]) >= 0.5)
+    opti.subject_to(X[-1][nq:] == 0.0)
+if(USE_L4FUNCTION):
+    opti.subject_to(back_reach_set_fun(X[-1]) >= PROB_TRESHOLD)
+    #cost += w_BwRS * (1-back_reach_set_fun(X[-1]))
 
 # print("Constraints added to the optimization:")
 # for constraint in cs.vertsplit(opti.g, 1):  # List all constraints
@@ -175,10 +179,6 @@ opts = {
     "ipopt.hessian_approximation": "limited-memory" 
 }
 opti.solver("ipopt", opts)
-
-# set up simulation environment
-if(SIMULATOR=="mujoco" and ADD_SPHERE):
-    simu.add_sphere(pos=SPHERE_POS, size=SPHERE_SIZE, rgba=SPHERE_RGBA)
 
 # Solve the problem to convergence the first time
 x = np.concatenate([q0, dq0])
@@ -232,10 +232,10 @@ for i in range(N_sim):
           "Iters: %3d"%sol.stats()['iter_count'], 
           "Tracking err: %.3f"%np.linalg.norm(q_des - x[:nq]))
 
-    if USE_TERMINAL_CONSTRAINT:
+    if USE_L4FUNCTION:
         final_state = sol.value(X[-1])  # Extract the numerical value of X[-1] from the solution
         terminal_value = back_reach_set_fun(final_state)  # Evaluate the neural network output
-        print("TERMINAL CONSTRAINT VALUE: ", terminal_value)
+        print("BwRS CONSTRAINT VALUE: ", terminal_value)
 
     tau = inv_dyn(sol.value(X[0]), sol.value(U[0])).toarray().squeeze()
 
@@ -249,11 +249,8 @@ for i in range(N_sim):
     data[i][6] = sol.value(U[0][0])
     data[i][7] = sol.value(U[0][1])
 
-    if(SIMULATOR=="mujoco"):
-        # do a proper simulation with Mujoco
-        simu.step(tau, dt)
-        x = np.concatenate([simu.data.qpos, simu.data.qvel])
-    elif(SIMULATOR=="pinocchio"):
+   
+    if(SIMULATOR=="pinocchio"):
         # do a proper simulation with Pinocchio
         simu.simulate(tau, dt, int(dt/dt_sim))
         x = np.concatenate([simu.q, simu.v])
@@ -262,24 +259,24 @@ for i in range(N_sim):
         x = sol.value(X[1])
         simu.display(x[:nq])
 
+
     if( np.any(x[:nq] > qMax)):
         print(colored("\nUPPER POSITION LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]>qMax)[0])
     if( np.any(x[:nq] < qMin)):
         print(colored("\nLOWER POSITION LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]<qMin)[0])
 
-    if( np.any(x[0] <= -3.4)):
-        print(colored("\nIMPACT DETECTED", "red"))
-
-    if( np.any(x[nq:] > vMax)):
+    if( np.any(x[nq:] > (vMax))):
         print(colored("\nUPPER VELOCITY LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]>qMax)[0])
-    if( np.any(x[nq:] < -vMax)):
+    if( np.any(x[nq:] < (vMin))):
         print(colored("\nLOWER VELOCITY LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]<qMin)[0])
 
-    if( np.any(tau > tau_max)):
+    if( np.any(tau > (tauMax))):
         print(colored("\nUPPER TORQUE LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]>qMax)[0])
-    if( np.any(tau < tau_min)):
+    if( np.any(tau < (tauMin))):
         print(colored("\nLOWER TORQUE LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]<qMin)[0])
 
+    if( np.any(x[:nq] <= q_lim)):
+        print(colored("\nIMPACT DETECTED", "red"), np.where(x[:nq]>qMax)[0])
 
 print("Mean Computation time: ", sum_times/N_sim)
 

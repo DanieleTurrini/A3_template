@@ -1,20 +1,33 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from adam.casadi.computations import KinDynComputations
+from example_robot_data.robots_loader import load
 import casadi as cs
 
-SOLVER_TOLERANCE = 1e-1
 
-def is_in_BwRS (robot, x_init, N, time_step, X_bounds, U_bounds):
+
+def is_in_BwRS (x_init, N):
     '''
     robot: robot model
     x_init: state to be checked (if belongs to the N-step backward reachable set)
     N: number of steps
-    time step: time step of the MPC problem
-    X_bounds: joint limits in the form: [q1min, q2min, dq1min, dq2min, q1MAX, q2MAX, dq1MAX, dq2MAX]
-    U_bounds: torque limits in the form of: [tau1min, tau2min, tau1MAX, tau2MAX]
-    **TO BE IMPLEMENTED->wall**
     '''
+    SOLVER_TOLERANCE = 1e-4
+    dt = 0.010 # time step MPC
+    VEL_BOUNDS_SCALING_FACTOR = 1.0
+    TORQUE_BOUNDS_SCALING_FACTOR = 5.0
+    qMin = np.array([-2.0*np.pi,-2.0*np.pi])
+    qMax = -qMin
+    vMax = np.array([10.0,10.0])*VEL_BOUNDS_SCALING_FACTOR
+    vMin = -vMax
+    tauMin = np.array([-1.0, -1.0])*TORQUE_BOUNDS_SCALING_FACTOR
+    tauMax = -tauMin
+    # Definition of a physical constraint that  doesn't allow the double pendulum to go beyond 
+    # a certain configuration (in terms of joint angles)
+    DELTA = 0.0
+    q_lim = np.array([-(np.pi+DELTA),-(0.0+DELTA)])
+
+    robot = load("double_pendulum")
     joints_name_list = [s for s in robot.model.names[1:]] # skip the first name because it is "universe"
     nq = len(joints_name_list)  # number of joints
     nx = 2*nq # size of the state variable
@@ -42,10 +55,10 @@ def is_in_BwRS (robot, x_init, N, time_step, X_bounds, U_bounds):
     tau = M @ ddq + h
     inv_dyn = cs.Function('inv_dyn', [state, ddq], [tau])  
     # pre-compute state and torque bounds
-    lbx = X_bounds[:nx].tolist()
-    ubx = X_bounds[nx:].tolist()
-    tau_min = U_bounds[:nq].tolist()
-    tau_max = U_bounds[nq:].tolist()
+    lbx = qMin.tolist() + vMin.tolist()
+    ubx = qMax.tolist() + vMax.tolist()
+    tau_min = tauMin.tolist()
+    tau_max = tauMax.tolist()
     # create all the decision variables
     X, U = [], []
     X += [opti.variable(nx)] # do not apply pos/vel bounds on initial state
@@ -55,11 +68,11 @@ def is_in_BwRS (robot, x_init, N, time_step, X_bounds, U_bounds):
     for k in range(N): 
         U += [opti.variable(nq)]
         # Add dynamics constraints
-        opti.subject_to(X[k+1] == X[k] + time_step * f(X[k], U[k]))
+        opti.subject_to(X[k+1] == X[k] + dt * f(X[k], U[k]))
         # Add torque constraints
         opti.subject_to( opti.bounded(tau_min, inv_dyn(X[k], U[k]), tau_max))
-        # Add a joint constrain on only joint 1
-        opti.subject_to(X[k][0] >= -3.4)
+       # Add physical constraints
+        opti.subject_to(X[k][:nq] >= q_lim)
     # Add initial condition of the state
     opti.subject_to(X[0] == param_x_init)
     # Constrain the final set to be a stationary point with zero velocity:

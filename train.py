@@ -7,28 +7,12 @@ import torch.nn as nn
 import torch.optim as optim
 from neural_network import NeuralNetwork
 from A3_template.BwRS import is_in_BwRS
-from example_robot_data.robots_loader import load
 import multiprocessing  # Use native Python multiprocessing module
 import l4casadi as l4c
 from casadi import MX, Function, exp, if_else
 
-# GLOBAL COMPUTE_LABEL FUNCTION (moved out of generate_data)
-def compute_label(state, robot, N, dt, q_bound, tau_bound):
-    """
-    Computes the label for a given state (whether in BwRS or not).
-    
-    Parameters:
-    - state: A single state vector [position1, position2, velocity1, velocity2]
-    - robot: The robot model to use
-    - N, dt, q_bound, tau_bound: Parameters for the BwRS computation
-    
-    Returns:
-    - Label indicating whether the state is inside the boundary of the reachable set (BwRS)
-    """
-    return is_in_BwRS(robot, state, N, dt, q_bound, tau_bound)
-
-# DATA GENERATION FUNCTION WITH TIMER
-def generate_data(save_path, num_samples=500, N=25, dt=0.01, use_multiprocessing=False):
+# GENERATE DATA FUNCTION
+def generate_data(save_path, num_samples=500, N=25, use_multiprocessing=False):
     """
     Generates random data for a double pendulum robot's state (positions and velocities),
     computes corresponding labels, and saves them as a torch dataset.
@@ -37,64 +21,57 @@ def generate_data(save_path, num_samples=500, N=25, dt=0.01, use_multiprocessing
     - save_path: Where the dataset will be saved
     - num_samples: Number of data samples to generate
     - N: Parameter used in the is_in_BwRS computation
-    - dt: Time step used in the robot simulation
     - use_multiprocessing: Flag to enable multiprocessing for label computation
     """
     # Start timer for data generation
-    start_time = time.time()  # Record the start time
-    
-    # Define bounds for the robot's state (positions, velocities) and torques
-    def create_bounds():
-        q_limit = 2.0 * np.pi  # Joint position limit
-        v_limit = 10.0         # Joint velocity limit
-        torque_limit = 10.0    # Torque limit
-        scaling_factor = 0.5   # Scaling factor for torque limits
-        
-        # State bounds: [theta1, theta2, v1, v2, -theta1, -theta2, -v1, -v2]
-        q_bound = [-q_limit, -q_limit, -v_limit, -v_limit, q_limit, q_limit, v_limit, v_limit]
-        
-        # Torque bounds
-        tau_bound = [-torque_limit * scaling_factor, -torque_limit * scaling_factor,
-                     torque_limit * scaling_factor, torque_limit * scaling_factor]
-        
-        return np.array(q_bound), np.array(tau_bound)
-    
-    q_bound, tau_bound = create_bounds()
-
-    # Load the robot model
-    robot = load("double_pendulum")
+    start_time = time.time()
+    print(f"Starting data generation for {num_samples} samples...")
     
     # Generate random states (positions and velocities)
-    pos = np.random.uniform(-2.0 * np.pi, 2.0 * np.pi, size=(num_samples, 2))
-    vel = np.random.uniform(-30.0, 30.0, size=(num_samples, 2))
-    states = np.hstack((pos, vel))  # Combine position and velocity into states
+    pos_J1 = np.random.uniform(-1.5 * np.pi, 0.2 * np.pi, size=(num_samples, 1))
+    pos_J2 = np.random.uniform(-0.5 * np.pi, 0.5 * np.pi, size=(num_samples, 1))
+    vel_J1 = np.random.uniform(-7.0, 7.0, size=(num_samples, 1))
+    vel_J2 = np.random.uniform(-2.0, 2.0, size=(num_samples, 1))
+    states = np.hstack((pos_J1, pos_J2, vel_J1, vel_J2))  # Combine position and velocity into states
     
-    # Parallelized label computation using multiprocessing or single-threaded option
+    labels = []  # Initialize an empty list to store labels
+    batch_size = 100  # Adjust batch size for progress tracking
+    
     if use_multiprocessing:
         # Using Python's built-in multiprocessing Pool to compute labels in parallel
         with multiprocessing.Pool() as pool:
-            labels = pool.starmap(compute_label, [(state, robot, N, dt, q_bound, tau_bound) for state in states])
+            labels = pool.starmap(is_in_BwRS, [(state, N) for state in states])
     else:
-        # Without multiprocessing, compute labels sequentially
-        labels = [compute_label(state, robot, N, dt, q_bound, tau_bound) for state in states]
+        # Sequential processing with progress tracking
+        for i in range(0, num_samples, batch_size):
+            batch_states = states[i:i + batch_size]
+            batch_labels = [is_in_BwRS(state, N) for state in batch_states]
+            labels.extend(batch_labels)
+            
+            # Progress tracking
+            elapsed_time = time.time() - start_time
+            processed_samples = i + batch_size
+            processed_samples = min(processed_samples, num_samples)  # Avoid overflow
+            
+            # Estimate time remaining
+            time_per_sample = elapsed_time / processed_samples
+            remaining_time = time_per_sample * (num_samples - processed_samples)
+            print(f"Progress: {processed_samples}/{num_samples} samples generated. "
+                  f"Elapsed: {elapsed_time:.2f}s, Remaining: {remaining_time:.2f}s")
     
     # Convert states and labels to torch tensors
     dataset = {
-        "states": torch.tensor(states, dtype=torch.float32),  # States tensor
-        "labels": torch.tensor(labels, dtype=torch.float32)   # Labels tensor
+        "states": torch.tensor(states, dtype=torch.float32),
+        "labels": torch.tensor(labels, dtype=torch.float32)
     }
     
     # Save the dataset as a PyTorch .pt file
     torch.save(dataset, save_path)
     
-    # End timer and calculate elapsed time
+    # End timer
     end_time = time.time()
-    elapsed_time = end_time - start_time  # Calculate elapsed time
-    
-    # Print how long the data generation took
     print(f"Dataset generated and saved to {save_path}")
-    print(f"Time taken for dataset generation: {elapsed_time:.2f} seconds")
-
+    print(f"Time taken for dataset generation: {end_time - start_time:.2f} seconds")
 # CREATE CASADI FUNCTION FROM NEURAL NETWORK
 def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
     """
@@ -120,7 +97,7 @@ def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         nn_name = os.path.join(NN_DIR, 'model.pt')
         nn_data = torch.load(nn_name, map_location=device)
-        model = NeuralNetwork(input_size=input_size, hidden_size=128, output_size=1, activation=nn.Tanh())
+        model = NeuralNetwork(input_size=input_size, hidden_size=32, output_size=1, activation=nn.Tanh())
         model.load_state_dict(nn_data['model'])  # Load the trained weights
 
     state = MX.sym("x", input_size)  # Define CasADi symbolic variable for the state
@@ -130,7 +107,7 @@ def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
     l4c_model = l4c.L4CasADi(model, 
                              device='cuda' if torch.cuda.is_available() else 'cpu',
                              name=f'{robot_name}_model', 
-                             build_dir=f'{NN_DIR}nn_{robot_name}')
+                             build_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), "l4casadi"))
 
     print(f"Input to model: {l4c_model(state).shape}")
 
@@ -172,7 +149,7 @@ def train_model(dataset_path, model_save_dir):
     
     # Define a simple neural network model
     input_size = 4  # 2 joint positions + 2 joint velocities
-    hidden_size = 128  # Hidden layer size
+    hidden_size = 32  # Hidden layer size
     output_size = 1  # Binary classification output
     
     # Initialize the model with a tanh activation function
@@ -188,7 +165,7 @@ def train_model(dataset_path, model_save_dir):
     model.to(device)
     
     # Train the model for a number of epochs
-    num_epochs = 150
+    num_epochs = 50
     for epoch in range(num_epochs):
         model.train()
         total_loss = 0
@@ -235,9 +212,9 @@ def train_model(dataset_path, model_save_dir):
     torch.save({'model': model.state_dict()}, model_path)
     print(f"Model saved to {model_path}")
     
-    # Save the model as a CasADi function using l4casadi
+    '''# Save the model as a CasADi function using l4casadi
     nn_func = create_casadi_function(robot_name="double_pendulum", NN_DIR=model_save_dir, input_size=input_size)
-    print("CasADi function created.")
+    print("CasADi function created.")'''
 
 # MAIN EXECUTION BLOCK
 if __name__ == "__main__":
@@ -251,16 +228,18 @@ if __name__ == "__main__":
     os.makedirs(model_save_dir, exist_ok=True)
     
     # Parameters for data generation
-    num_samples = 1000  # Number of samples to generate
-    N = 100              # Parameter for BwRS computation
+    num_samples = 20000  # Number of samples to generate
+    N = 20              # Parameter for BwRS computation
     dt = 0.01           # Time step for simulation
     
     # Flag to enable multiprocessing (True or False)
     use_multiprocessing = False  # Set to True to enable parallel label computation
 
     # Generate data and train model
-    generate_data(dataset_path, num_samples=num_samples, N=N, dt=dt, use_multiprocessing=use_multiprocessing)
+    #generate_data(dataset_path, num_samples=num_samples, N=N, use_multiprocessing=use_multiprocessing)
     train_model(dataset_path, model_save_dir)
+
+
 
 
 
