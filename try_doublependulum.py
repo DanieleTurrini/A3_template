@@ -64,7 +64,7 @@ w_final_v = 0e0 # final velocity cost weight
 w_BwRS = 1e5 # backward reachable set weight
 USE_Q_LIM_CONSTRAINT = 1
 USE_TERMINAL_CONSTRAINT = 0
-PROB_TRESHOLD = 0.999
+PROB_TRESHOLD = 0.8
 USE_L4FUNCTION = 1
 
 
@@ -200,11 +200,12 @@ opti.solver("ipopt", opts)
 
 # Initialize a storage for position trajectories
 trajectories = []
-time_steps = np.arange(N+1) * dt
+controls = []
+time_steps = np.arange(N+1) * dt_sim
+time_steps_control = np.arange(N) * dt_sim
 
 data = np.zeros((N_sim, 8))
 sum_times = 0
-count = 0
 
 print("Start the MPC loop")
 for i in range(N_sim):
@@ -256,6 +257,7 @@ for i in range(N_sim):
 
     if i % 5 == 0 and i > 0:  # Plot every 5 iterations
         trajectories.append([sol.value(X[k]) for k in range(N+1)])
+        controls.append([sol.value(U[k]) for k in range(N)])
 
    
     if(SIMULATOR=="pinocchio"):
@@ -288,56 +290,77 @@ for i in range(N_sim):
 print("Mean Computation time: ", sum_times/N_sim)
 
 # Plots 
-
-fig, axs = plt.subplots(2, 1)  # Create 2 subplots (2 rows, 1 column)
-
-# Plot Joint 1 trajectories
-for j, traj in enumerate(trajectories):
-    positions = np.array(traj)
-    axs[0].plot(time_steps + dt * j * 5, positions[:, 0])
-axs[0].set_xlabel('Time [s]')
-axs[0].set_ylabel('Position [rad]')
-axs[0].set_title('Joint 1 MPC Position Trajectories')
-axs[0].grid(True)
-
-# Plot Joint 2 trajectories
-for j, traj in enumerate(trajectories):
-    positions = np.array(traj)
-    axs[1].plot(time_steps + dt * j * 5, positions[:, 1])
-axs[1].set_xlabel('Time [s]')
-axs[1].set_ylabel('Position [rad]')
-axs[1].set_title('Joint 2 MPC Position Trajectories')
-axs[1].grid(True)
-
-# Adjust layout to prevent overlap
-plt.tight_layout()
-
-fig, axs = plt.subplots(2, 1)  # Create 2 subplots (2 rows, 1 column)
-
-# Plot Joint 1 trajectories
-for j, traj in enumerate(trajectories):
-    velocities = np.array(traj)
-    axs[0].plot(time_steps + dt * j * 5, velocities[:, 2])
-axs[0].set_xlabel('Time [s]')
-axs[0].set_ylabel('Velocity [rad/s]')
-axs[0].set_title('Joint 1 MPC Velocity Trajecoties')
-axs[0].grid(True)
-
-# Plot Joint 2 trajectories
-for j, traj in enumerate(trajectories):
-    velocities = np.array(traj)
-    axs[1].plot(time_steps + dt * j * 5, velocities[:, 3])
-axs[1].set_xlabel('Time [s]')
-axs[1].set_ylabel('Velocity [rad/s]')
-axs[1].set_title('Joint 2 MPC Velocity Trajectories')
-axs[1].grid(True)
-
-# Adjust layout to prevent overlap
-plt.tight_layout()
-
-
-# plot joint trajectories
 if(DO_PLOTS):
+    fig, axs = plt.subplots(2, 1)  # Create 2 subplots (2 rows, 1 column)
+
+    # Plot Joint 1 trajectories
+    for j, traj in enumerate(trajectories):
+        positions = np.array(traj)
+        axs[0].plot(time_steps + dt_sim * j * 5, positions[:, 0])
+    axs[0].set_xlabel('Time [s]')
+    axs[0].set_ylabel('Position [rad]')
+    axs[0].set_title('Joint 1 MPC Position Trajectories')
+    axs[0].grid(True)
+
+    # Plot Joint 2 trajectories
+    for j, traj in enumerate(trajectories):
+        positions = np.array(traj)
+        axs[1].plot(time_steps + dt_sim * j * 5, positions[:, 1])
+    axs[1].set_xlabel('Time [s]')
+    axs[1].set_ylabel('Position [rad]')
+    axs[1].set_title('Joint 2 MPC Position Trajectories')
+    axs[1].grid(True)
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+
+    fig, axs = plt.subplots(2, 1)  # Create 2 subplots (2 rows, 1 column)
+
+    # Plot Joint 1 trajectories
+    for j, traj in enumerate(trajectories):
+        velocities = np.array(traj)
+        axs[0].plot(time_steps + dt_sim * j * 5, velocities[:, 2])
+    axs[0].set_xlabel('Time [s]')
+    axs[0].set_ylabel('Velocity [rad/s]')
+    axs[0].set_title('Joint 1 MPC Velocity Trajecoties')
+    axs[0].grid(True)
+
+    # Plot Joint 2 trajectories
+    for j, traj in enumerate(trajectories):
+        velocities = np.array(traj)
+        axs[1].plot(time_steps + dt_sim * j * 5, velocities[:, 3])
+    axs[1].set_xlabel('Time [s]')
+    axs[1].set_ylabel('Velocity [rad/s]')
+    axs[1].set_title('Joint 2 MPC Velocity Trajectories')
+    axs[1].grid(True)
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+
+    fig, axs = plt.subplots(2, 1)  # Create 2 subplots (2 rows, 1 column)
+
+    # Plot Joint 1 trajectories
+    for j, traj in enumerate(controls):
+        acc = np.array(traj)
+        axs[0].plot(time_steps_control + dt_sim * j * 5, acc[:, 0])
+    axs[0].set_xlabel('Time [s]')
+    axs[0].set_ylabel('Control')
+    axs[0].set_title('Joint 1 MPC Control Trajecoties')
+    axs[0].grid(True)
+
+    # Plot Joint 2 trajectories
+    for j, traj in enumerate(controls):
+        acc = np.array(traj)
+        axs[1].plot(time_steps_control + dt_sim * j * 5, acc[:, 1])
+    axs[1].set_xlabel('Time [s]')
+    axs[1].set_ylabel('Control')
+    axs[1].set_title('Joint 2 MPC Control Trajectories')
+    axs[1].grid(True)
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+
+    # plot joint trajectories
     time = np.arange(0, (N_sim)*dt_sim, dt_sim)
     # Plot of the joint coordinates
     plt.figure(figsize=(10, 6))
@@ -349,7 +372,7 @@ if(DO_PLOTS):
     plt.xlabel('Time [s]')
     plt.ylabel('Joint coordinates [m]')
     plt.title('Joint coordinates')
-    plt.legend()
+    plt.legend(loc='upper right')
     plt.grid(True)
 
     # Plot of joints velocities
@@ -361,7 +384,7 @@ if(DO_PLOTS):
     plt.xlabel('Time [s]')
     plt.ylabel('Joint velocities [m/s]')
     plt.title('Joint velocities')
-    plt.legend()
+    plt.legend(loc='upper right')
     plt.grid(True)
 
     # Plot of joints torques
@@ -373,7 +396,7 @@ if(DO_PLOTS):
     plt.xlabel('Time [s]')
     plt.ylabel('Joint torques [Nm]')
     plt.title('Joint torques')
-    plt.legend()
+    plt.legend(loc='upper right')
     plt.grid(True)
 
     # Plot of joints torques
@@ -385,7 +408,7 @@ if(DO_PLOTS):
     plt.xlabel('Time [s]')
     plt.ylabel('Joint Control [Nm]')
     plt.title('Joint Control')
-    plt.legend()
+    plt.legend(loc='upper right')
     plt.grid(True)
    
     plt.show()

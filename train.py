@@ -111,7 +111,7 @@ def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
     # if load_weights is True, we load the neural-network weights from a ".pt" file
     if load_weights:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        nn_name = os.path.join(NN_DIR, 'model.pt')
+        nn_name = os.path.join(NN_DIR, 'model_50.pt')
         nn_data = torch.load(nn_name, map_location=device)
         model = NeuralNetwork(input_size=input_size, hidden_size=32, output_size=1, activation=nn.Tanh())
         model.load_state_dict(nn_data['model'])  # Load the trained weights
