@@ -64,7 +64,7 @@ w_final_v = 0e0 # final velocity cost weight
 w_BwRS = 1e5 # backward reachable set weight
 USE_Q_LIM_CONSTRAINT = 1
 USE_TERMINAL_CONSTRAINT = 0
-PROB_TRESHOLD = 0.99
+PROB_TRESHOLD = 0.999
 USE_L4FUNCTION = 1
 
 

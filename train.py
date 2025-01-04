@@ -35,14 +35,30 @@ def generate_data(save_path, num_samples=500, N=25, use_multiprocessing=False):
     states = np.hstack((pos_J1, pos_J2, vel_J1, vel_J2))  # Combine position and velocity into states
     
     labels = []  # Initialize an empty list to store labels
-    batch_size = 100  # Adjust batch size for progress tracking
-    
+
     if use_multiprocessing:
-        # Using Python's built-in multiprocessing Pool to compute labels in parallel
-        with multiprocessing.Pool() as pool:
-            labels = pool.starmap(is_in_BwRS, [(state, N) for state in states])
+        # Using Python's multiprocessing Manager for shared progress tracking
+        with multiprocessing.Manager() as manager:
+            progress_counter = manager.Value('i', 0)  # Shared counter to track progress
+            
+            def label_computation(state):
+                result = is_in_BwRS(state, N)
+                with progress_counter.get_lock():
+                    progress_counter.value += 1
+                # Print progress
+                processed_samples = progress_counter.value
+                elapsed_time = time.time() - start_time
+                time_per_sample = elapsed_time / processed_samples
+                remaining_time = time_per_sample * (num_samples - processed_samples)
+                print(f"Progress: {processed_samples}/{num_samples} samples generated. "
+                      f"Elapsed: {elapsed_time:.2f}s, Remaining: {remaining_time:.2f}s", end="\r")
+                return result
+
+            with multiprocessing.Pool() as pool:
+                labels = pool.map(label_computation, states)
     else:
         # Sequential processing with progress tracking
+        batch_size = 100  # Adjust batch size for progress tracking
         for i in range(0, num_samples, batch_size):
             batch_states = states[i:i + batch_size]
             batch_labels = [is_in_BwRS(state, N) for state in batch_states]
@@ -57,7 +73,7 @@ def generate_data(save_path, num_samples=500, N=25, use_multiprocessing=False):
             time_per_sample = elapsed_time / processed_samples
             remaining_time = time_per_sample * (num_samples - processed_samples)
             print(f"Progress: {processed_samples}/{num_samples} samples generated. "
-                  f"Elapsed: {elapsed_time:.2f}s, Remaining: {remaining_time:.2f}s")
+                  f"Elapsed: {elapsed_time:.2f}s, Remaining: {remaining_time:.2f}s", end="\r")
     
     # Convert states and labels to torch tensors
     dataset = {
@@ -70,7 +86,7 @@ def generate_data(save_path, num_samples=500, N=25, use_multiprocessing=False):
     
     # End timer
     end_time = time.time()
-    print(f"Dataset generated and saved to {save_path}")
+    print(f"\nDataset generated and saved to {save_path}")
     print(f"Time taken for dataset generation: {end_time - start_time:.2f} seconds")
 # CREATE CASADI FUNCTION FROM NEURAL NETWORK
 def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
@@ -228,7 +244,7 @@ if __name__ == "__main__":
     os.makedirs(model_save_dir, exist_ok=True)
     
     # Parameters for data generation
-    num_samples = 20000  # Number of samples to generate
+    num_samples = 40000  # Number of samples to generate
     N = 20              # Parameter for BwRS computation
     dt = 0.01           # Time step for simulation
     
@@ -236,7 +252,7 @@ if __name__ == "__main__":
     use_multiprocessing = False  # Set to True to enable parallel label computation
 
     # Generate data and train model
-    #generate_data(dataset_path, num_samples=num_samples, N=N, use_multiprocessing=use_multiprocessing)
+    generate_data(dataset_path, num_samples=num_samples, N=N, use_multiprocessing=use_multiprocessing)
     train_model(dataset_path, model_save_dir)
 
 
