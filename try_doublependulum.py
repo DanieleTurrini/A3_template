@@ -63,9 +63,10 @@ w_a = 1e-8  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
 w_BwRS = 1e5 # backward reachable set weight
 USE_Q_LIM_CONSTRAINT = 1
-USE_TERMINAL_CONSTRAINT = 1
-PROB_TRESHOLD = 0.5
-USE_L4FUNCTION = 0
+USE_TERMINAL_CONSTRAINT = 0
+PROB_TRESHOLD = 0.999
+USE_L4FUNCTION = 1
+
 
 r = RobotWrapper(robot.model, robot.collision_model, robot.visual_model)
 simu = RobotSimulator(conf_doublep, r)
