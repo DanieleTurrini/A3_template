@@ -26,7 +26,7 @@ def compare_real_and_nn(robot_name, nn_model_dir, input_size, x0, N):
     # Loop to compare the outputs
     for i in range(N):
         # Real function output (1 if feasible, 0 otherwise)
-        real_output = is_in_BwRS(x0, 20)
+        real_output = is_in_BwRS(x0, N)
 
         # Neural network function output
         nn_output = nn_func(DM(x0))
@@ -52,6 +52,6 @@ if __name__ == "__main__":
     robot_name = "double_pendulum"
     input_size = 4
     x0 = [0.0, 0.0, 500.0, 500.0]  # Example starting state
-    N = 100  # Number of steps for comparison
+    N = 200  # Number of steps for comparison
 
     compare_real_and_nn(robot_name, nn_model_dir, input_size, x0, N)

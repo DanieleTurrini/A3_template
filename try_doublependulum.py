@@ -34,7 +34,7 @@ DO_WARM_START = True
 SOLVER_TOLERANCE = 1e-4
 SOLVER_MAX_ITER = 3
 
-DO_PLOTS = False
+DO_PLOTS = True
 SIMULATOR = "pinocchio" #"pinocchio" or "ideal"
 VEL_BOUNDS_SCALING_FACTOR = 1.0
 TORQUE_BOUNDS_SCALING_FACTOR = 9.0
@@ -63,10 +63,9 @@ w_a = 1e-8  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
 w_BwRS = 1e5 # backward reachable set weight
 USE_Q_LIM_CONSTRAINT = 1
-USE_TERMINAL_CONSTRAINT = 0
-PROB_TRESHOLD = 0.99
-USE_L4FUNCTION = 1
-
+USE_TERMINAL_CONSTRAINT = 1
+PROB_TRESHOLD = 0.5
+USE_L4FUNCTION = 0
 
 r = RobotWrapper(robot.model, robot.collision_model, robot.visual_model)
 simu = RobotSimulator(conf_doublep, r)
@@ -198,8 +197,13 @@ print("Last control:", opti.debug.value(U[-1]))
 opts["ipopt.max_iter"] = SOLVER_MAX_ITER
 opti.solver("ipopt", opts)
 
+# Initialize a storage for position trajectories
+trajectories = []
+time_steps = np.arange(N+1) * dt
+
 data = np.zeros((N_sim, 8))
 sum_times = 0
+count = 0
 
 print("Start the MPC loop")
 for i in range(N_sim):
@@ -249,6 +253,9 @@ for i in range(N_sim):
     data[i][6] = sol.value(U[0][0])
     data[i][7] = sol.value(U[0][1])
 
+    if i % 5 == 0 and i > 0:  # Plot every 5 iterations
+        trajectories.append([sol.value(X[k]) for k in range(N+1)])
+
    
     if(SIMULATOR=="pinocchio"):
         # do a proper simulation with Pinocchio
@@ -258,7 +265,6 @@ for i in range(N_sim):
         # use state predicted by the MPC as next state
         x = sol.value(X[1])
         simu.display(x[:nq])
-
 
     if( np.any(x[:nq] > qMax)):
         print(colored("\nUPPER POSITION LIMIT VIOLATED ON JOINTS", "red"), np.where(x[:nq]>qMax)[0])
@@ -281,6 +287,54 @@ for i in range(N_sim):
 print("Mean Computation time: ", sum_times/N_sim)
 
 # Plots 
+
+fig, axs = plt.subplots(2, 1)  # Create 2 subplots (2 rows, 1 column)
+
+# Plot Joint 1 trajectories
+for j, traj in enumerate(trajectories):
+    positions = np.array(traj)
+    axs[0].plot(time_steps + dt * j * 5, positions[:, 0])
+axs[0].set_xlabel('Time [s]')
+axs[0].set_ylabel('Position [rad]')
+axs[0].set_title('Joint 1 MPC Position Trajectories')
+axs[0].grid(True)
+
+# Plot Joint 2 trajectories
+for j, traj in enumerate(trajectories):
+    positions = np.array(traj)
+    axs[1].plot(time_steps + dt * j * 5, positions[:, 1])
+axs[1].set_xlabel('Time [s]')
+axs[1].set_ylabel('Position [rad]')
+axs[1].set_title('Joint 2 MPC Position Trajectories')
+axs[1].grid(True)
+
+# Adjust layout to prevent overlap
+plt.tight_layout()
+
+fig, axs = plt.subplots(2, 1)  # Create 2 subplots (2 rows, 1 column)
+
+# Plot Joint 1 trajectories
+for j, traj in enumerate(trajectories):
+    velocities = np.array(traj)
+    axs[0].plot(time_steps + dt * j * 5, velocities[:, 2])
+axs[0].set_xlabel('Time [s]')
+axs[0].set_ylabel('Velocity [rad/s]')
+axs[0].set_title('Joint 1 MPC Velocity Trajecoties')
+axs[0].grid(True)
+
+# Plot Joint 2 trajectories
+for j, traj in enumerate(trajectories):
+    velocities = np.array(traj)
+    axs[1].plot(time_steps + dt * j * 5, velocities[:, 3])
+axs[1].set_xlabel('Time [s]')
+axs[1].set_ylabel('Velocity [rad/s]')
+axs[1].set_title('Joint 2 MPC Velocity Trajectories')
+axs[1].grid(True)
+
+# Adjust layout to prevent overlap
+plt.tight_layout()
+
+
 # plot joint trajectories
 if(DO_PLOTS):
     time = np.arange(0, (N_sim)*dt_sim, dt_sim)
@@ -289,6 +343,8 @@ if(DO_PLOTS):
     for i in range(nq):
         plt.plot(time, data[:,i], label=f'q {i}', alpha=0.7)
         plt.plot(time, np.full_like(time, q_des[i]), linestyle='dotted',label=f'q {i} desired' )
+    plt.plot(time, np.full_like(time, -(np.pi + 0.1)), color = 'red',label=f'BOUNDS')
+    plt.plot(time, np.full_like(time, -0.1), color = 'red')
     plt.xlabel('Time [s]')
     plt.ylabel('Joint coordinates [m]')
     plt.title('Joint coordinates')

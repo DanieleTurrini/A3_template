@@ -208,7 +208,7 @@ def train_model(dataset_path, model_save_dir):
     if not os.path.exists(model_save_dir):
         os.makedirs(model_save_dir)  # Create directory if not exists
     
-    model_path = os.path.join(model_save_dir, "model.pt")
+    model_path = os.path.join(model_save_dir, "model.pt")     
     torch.save({'model': model.state_dict()}, model_path)
     print(f"Model saved to {model_path}")
     
@@ -220,7 +220,7 @@ def train_model(dataset_path, model_save_dir):
 if __name__ == "__main__":
     # Paths for saving/loading data and models
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    dataset_path = os.path.join(script_dir, "dataset", "training_data.pt")
+    dataset_path = os.path.join(script_dir, "dataset", "training_data_200.pt")
     model_save_dir = os.path.join(script_dir, "nn_models")
     
     # Create directories if not exist
@@ -228,15 +228,15 @@ if __name__ == "__main__":
     os.makedirs(model_save_dir, exist_ok=True)
     
     # Parameters for data generation
-    num_samples = 20000  # Number of samples to generate
-    N = 20              # Parameter for BwRS computation
+    num_samples = 5000  # Number of samples to generate
+    N = 200             # Parameter for BwRS computation
     dt = 0.01           # Time step for simulation
     
     # Flag to enable multiprocessing (True or False)
     use_multiprocessing = False  # Set to True to enable parallel label computation
 
     # Generate data and train model
-    #generate_data(dataset_path, num_samples=num_samples, N=N, use_multiprocessing=use_multiprocessing)
+    generate_data(dataset_path, num_samples=num_samples, N=N, use_multiprocessing=use_multiprocessing)
     train_model(dataset_path, model_save_dir)
 
 
