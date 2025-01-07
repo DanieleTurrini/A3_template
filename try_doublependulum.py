@@ -37,16 +37,19 @@ SOLVER_MAX_ITER = 3
 DO_PLOTS = True
 SIMULATOR = "pinocchio" #"pinocchio" or "ideal"
 VEL_BOUNDS_SCALING_FACTOR = 1.0
-TORQUE_BOUNDS_SCALING_FACTOR = 9.0
+TORQUE_BOUNDS_SCALING_FACTOR = 0.6
 qMin = np.array([-2.0*np.pi,-2.0*np.pi])
 qMax = -qMin
 vMax = np.array([10.0,10.0])*VEL_BOUNDS_SCALING_FACTOR
 vMin = -vMax
 tauMin = np.array([-1.0, -1.0])*TORQUE_BOUNDS_SCALING_FACTOR
 tauMax = -tauMin
+
+accMax = np.array([20.0, 20.0])
+accMin = - accMax
 # Definition of a physical constraint that  doesn't allow the double pendulum to go beyond 
 # a certain configuration (in terms of joint angles)
-DELTA = 0.1
+DELTA = 0.05
 q_lim = np.array([-(np.pi+DELTA),-(0.0+DELTA)])
 
 dt_sim = 0.002
@@ -59,14 +62,13 @@ N = 30 #int(N_sim/10)  # time horizon MPC
 q_des = np.array([-np.pi, 0])
 w_p = 1e2   # position weight
 w_v = 1e-8  # velocity weight
-w_a = 1e-8  # acceleration weight
+w_a = 1e-4  # acceleration weight
 w_final_v = 0e0 # final velocity cost weight
 w_BwRS = 1e5 # backward reachable set weight
 USE_Q_LIM_CONSTRAINT = 1
 USE_TERMINAL_CONSTRAINT = 0
-PROB_TRESHOLD = 0.8
+PROB_TRESHOLD = 0.5
 USE_L4FUNCTION = 1
-
 
 r = RobotWrapper(robot.model, robot.collision_model, robot.visual_model)
 simu = RobotSimulator(conf_doublep, r)
@@ -108,6 +110,8 @@ lbx = qMin.tolist() + (-vMax).tolist()
 ubx = qMax.tolist() + vMax.tolist()
 tau_min = tauMin.tolist()
 tau_max = tauMax.tolist()
+acc_min = accMin.tolist()
+acc_max = accMax.tolist()
 print('lbx',lbx)
 print('ubx',ubx)
 print('tau_min',tau_min)
@@ -129,7 +133,7 @@ for k in range(1, N+1):
     opti.subject_to(opti.bounded(lbx, X[-1], ubx))
 for k in range(N): 
     U += [opti.variable(nq)]
-    opti.subject_to(opti.bounded(tau_min, U[-1], tau_max))
+    #opti.subject_to(opti.bounded(acc_min, U[-1], acc_max))
 
 print("Add initial conditions")
 opti.subject_to(X[0] == param_x_init)
@@ -258,7 +262,6 @@ for i in range(N_sim):
     if i % 5 == 0 and i > 0:  # Plot every 5 iterations
         trajectories.append([sol.value(X[k]) for k in range(N+1)])
         controls.append([sol.value(U[k]) for k in range(N)])
-
    
     if(SIMULATOR=="pinocchio"):
         # do a proper simulation with Pinocchio
@@ -406,7 +409,7 @@ if(DO_PLOTS):
         plt.plot(time, np.full_like(time, tau_max[i]), linestyle='dotted',label=f'Maximum torque joint {i}' )
         plt.plot(time, np.full_like(time, tau_min[i]), linestyle='dotted',label=f'Minimum torque joint {i}' )
     plt.xlabel('Time [s]')
-    plt.ylabel('Joint Control [Nm]')
+    plt.ylabel('Joint Control')
     plt.title('Joint Control')
     plt.legend(loc='upper right')
     plt.grid(True)

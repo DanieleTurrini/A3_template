@@ -15,7 +15,7 @@ def is_in_BwRS (x_init, N):
     SOLVER_TOLERANCE = 1e-4
     dt = 0.010 # time step MPC
     VEL_BOUNDS_SCALING_FACTOR = 1.0
-    TORQUE_BOUNDS_SCALING_FACTOR = 5.0
+    TORQUE_BOUNDS_SCALING_FACTOR = 0.6
     qMin = np.array([-2.0*np.pi,-2.0*np.pi])
     qMax = -qMin
     vMax = np.array([10.0,10.0])*VEL_BOUNDS_SCALING_FACTOR
@@ -24,7 +24,7 @@ def is_in_BwRS (x_init, N):
     tauMax = -tauMin
     # Definition of a physical constraint that  doesn't allow the double pendulum to go beyond 
     # a certain configuration (in terms of joint angles)
-    DELTA = 0.0
+    DELTA = 0.05
     q_lim = np.array([-(np.pi+DELTA),-(0.0+DELTA)])
 
     robot = load("double_pendulum")

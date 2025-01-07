@@ -42,7 +42,7 @@ def generate_data(save_path, num_samples=500, N=25, use_multiprocessing=False):
             progress_counter = manager.Value('i', 0)  # Shared counter to track progress
             
             def label_computation(state):
-                result = is_in_BwRS(state, N)
+                result = is_in_BwRS(state, N)   ################
                 with progress_counter.get_lock():
                     progress_counter.value += 1
                 # Print progress
@@ -94,7 +94,7 @@ def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
     Creates a CasADi function for the trained neural network using L4CasADi.
     
     Parameters:
-    - robot_name: The name of the robot model
+    - robot_name:The name of the robot model
     - NN_DIR: Directory containing the trained neural network model (.pt file)
     - input_size: The size of the input to the neural network
     - load_weights: Boolean flag to load weights from the `.pt` file (default: True)
@@ -111,7 +111,7 @@ def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
     # if load_weights is True, we load the neural-network weights from a ".pt" file
     if load_weights:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        nn_name = os.path.join(NN_DIR, 'model_50.pt')
+        nn_name = os.path.join(NN_DIR, 'model_50.pt') #################
         nn_data = torch.load(nn_name, map_location=device)
         model = NeuralNetwork(input_size=input_size, hidden_size=32, output_size=1, activation=nn.Tanh())
         model.load_state_dict(nn_data['model'])  # Load the trained weights
@@ -224,7 +224,7 @@ def train_model(dataset_path, model_save_dir):
     if not os.path.exists(model_save_dir):
         os.makedirs(model_save_dir)  # Create directory if not exists
     
-    model_path = os.path.join(model_save_dir, "model.pt")     
+    model_path = os.path.join(model_save_dir, "model_25.pt") ################
     torch.save({'model': model.state_dict()}, model_path)
     print(f"Model saved to {model_path}")
     
@@ -236,7 +236,7 @@ def train_model(dataset_path, model_save_dir):
 if __name__ == "__main__":
     # Paths for saving/loading data and models
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    dataset_path = os.path.join(script_dir, "dataset", "training_data_200.pt")
+    dataset_path = os.path.join(script_dir, "dataset", "training_data_25.pt")  ###############
     model_save_dir = os.path.join(script_dir, "nn_models")
     
     # Create directories if not exist
@@ -245,15 +245,14 @@ if __name__ == "__main__":
     
     # Parameters for data generation
     num_samples = 5000  # Number of samples to generate
-    N = 200             # Parameter for BwRS computation
+    N = 200         # Parameter for BwRS computation  ##############
     dt = 0.01           # Time step for simulation
     
     # Flag to enable multiprocessing (True or False)
     use_multiprocessing = False  # Set to True to enable parallel label computation
 
     # Generate data and train model
-    generate_data(dataset_path, num_samples=num_samples, N=N, use_multiprocessing=use_multiprocessing)
-    generate_data(dataset_path, num_samples=num_samples, N=N, use_multiprocessing=use_multiprocessing)
+    #generate_data(dataset_path, num_samples=num_samples, N=N, use_multiprocessing=use_multiprocessing)
     train_model(dataset_path, model_save_dir)
 
 
