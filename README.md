@@ -1,7 +1,3 @@
-<script type="text/javascript" async
-  src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 # A3_template
 # Learning an Approximate Control-Invariant Set for MPC
 
@@ -17,15 +13,14 @@ We aim to determine whether an initial state $x_{init}$ belongs to the N-step ba
 
 To check if a state $x_{init}$ belongs to the backward reachable set, we solve the following **Optimal Control Problem (OCP)**:
 
-$
-\min_{X, U} 1
-$
+$\min_{X,U} \space \space \space 1$
 
 **subject to:**
 - $x_{i+1} = f(x_i, u_i), \quad i = 0, \dots, N-1$
 - $x_{i+1} \in X, \quad u_i \in U, \quad i = 0, \dots, N-1$
 - $x_0 = x_{\text{init}}$
 - $x_N \in S$
+
 
 
 If the OCP has a solution, $x_{init}$ belongs to the set; otherwise, it does not.
