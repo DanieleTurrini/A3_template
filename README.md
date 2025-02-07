@@ -13,14 +13,13 @@ We aim to determine whether an initial state $x_{init}$ belongs to the N-step ba
 
 To check if a state $x_{init}$ belongs to the backward reachable set, we solve the following **Optimal Control Problem (OCP)**:
 
-$$
-\min_{X, U} 1
-$$
+$$\min_{X, U} 1$$
+
 subject to:
- $x_{i+1} = f(x_i, u_i)$ for $i = 0, \dots, N-1$
- $x_{i+1} \in X, u_i \in U$ for $i = 0, \dots, N-1$
- $x_0 = x_{init}$
- $x_N \in S$
+- $x_{i+1} = f(x_i, u_i)$ for $i = 0, \dots, N-1$
+- $x_{i+1} \in X, u_i \in U$ for $i = 0, \dots, N-1$
+- $x_0 = x_{init}$
+- $x_N \in S$
 
 If the OCP has a solution, $x_{init}$ belongs to the set; otherwise, it does not.
 
