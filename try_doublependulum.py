@@ -8,12 +8,12 @@ from time import sleep
 from termcolor import colored
 from A3_template.train import create_casadi_function
 
-import orc.utils.plot_utils as plut
+import utils.plot_utils as plut
 from example_robot_data.robots_loader import load
-import orc.A3_template.conf_doublep as conf_doublep
-from orc.utils.robot_simulator import RobotSimulator
-from orc.utils.robot_loaders import loadPendulum
-from orc.utils.robot_wrapper import RobotWrapper
+import A3_template.conf_doublep as conf_doublep
+from utils.robot_simulator import RobotSimulator
+from utils.robot_loaders import loadPendulum
+from utils.robot_wrapper import RobotWrapper
 
 print("Load robot model")
 robot = load("double_pendulum")
@@ -24,17 +24,11 @@ nq = len(joints_name_list)  # number of joints
 nx = 2*nq # size of the state variable
 kinDyn = KinDynComputations(robot.urdf, joints_name_list)
 
-# WITH THIS CONFIGURATION THE SOLVER ENDS UP VIOLATING THE JOINT LIMITS
-# ADDING THE TERMINAL CONSTRAINT FIXES EVERYTHING!
-# BUT SO DOES:
-# - DECREASING THE POSITION WEIGHT IN THE COST
-# - INCREASING THE ACCELERATION WEIGHT IN THE COST
-# - INCREASING THE MAX NUMBER OF ITERATIONS OF THE SOLVER
 DO_WARM_START = True
 SOLVER_TOLERANCE = 1e-4
 SOLVER_MAX_ITER = 3
 
-DO_PLOTS = True
+DO_PLOTS = False
 SIMULATOR = "pinocchio" #"pinocchio" or "ideal"
 VEL_BOUNDS_SCALING_FACTOR = 1.0
 TORQUE_BOUNDS_SCALING_FACTOR = 0.6
@@ -161,11 +155,6 @@ if(USE_TERMINAL_CONSTRAINT):
     opti.subject_to(X[-1][nq:] == 0.0)
 if(USE_L4FUNCTION):
     opti.subject_to(back_reach_set_fun(X[-1]) >= PROB_TRESHOLD)
-    #cost += w_BwRS * (1-back_reach_set_fun(X[-1]))
-
-# print("Constraints added to the optimization:")
-# for constraint in cs.vertsplit(opti.g, 1):  # List all constraints
-#     print(constraint)
 
 opti.minimize(cost)
 
@@ -178,9 +167,10 @@ opts = {
     "ipopt.compl_inf_tol": SOLVER_TOLERANCE,
     "print_time": 0,                # print information about execution time
     "detect_simple_bounds": True,
-    "ipopt.nlp_scaling_method": "gradient-based",
     "ipopt.max_iter": 1000,
-    "ipopt.hessian_approximation": "limited-memory" 
+    #"ipopt.mu_oracle": "probing",
+    "ipopt.hessian_approximation": "limited-memory"
+    
 }
 opti.solver("ipopt", opts)
 
@@ -188,11 +178,6 @@ opti.solver("ipopt", opts)
 x = np.concatenate([q0, dq0])
 opti.set_value(param_q_des, q_des)
 opti.set_value(param_x_init, x)
-
-### List all constraints -> this part used only for debugging
-# print("Constraints added to the optimization:")
-# for i, constraint in enumerate(cs.vertsplit(opti.g, 1)):
-#    print(f"Constraint {i}: {constraint}")
 
 sol = opti.solve()
 
@@ -256,8 +241,6 @@ for i in range(N_sim):
     data[i][3] = x[3] # joint 2 vel
     data[i][4] = tau[0] #sol.value(U[1][0]) # joint 1 torque
     data[i][5] = tau[1] #sol.value(U[1][1]) # joint 2 torque
-    data[i][6] = sol.value(U[0][0])
-    data[i][7] = sol.value(U[0][1])
 
     if i % 5 == 0 and i > 0:  # Plot every 5 iterations
         trajectories.append([sol.value(X[k]) for k in range(N+1)])
@@ -402,16 +385,5 @@ if(DO_PLOTS):
     plt.legend(loc='upper right')
     plt.grid(True)
 
-    # Plot of joints torques
-    plt.figure(figsize=(10, 6))
-    for i in range(nq):
-        plt.plot(time, data[:,i+6], label=f'Control U {i}', alpha=0.7)
-        plt.plot(time, np.full_like(time, tau_max[i]), linestyle='dotted',label=f'Maximum torque joint {i}' )
-        plt.plot(time, np.full_like(time, tau_min[i]), linestyle='dotted',label=f'Minimum torque joint {i}' )
-    plt.xlabel('Time [s]')
-    plt.ylabel('Joint Control')
-    plt.title('Joint Control')
-    plt.legend(loc='upper right')
-    plt.grid(True)
    
     plt.show()

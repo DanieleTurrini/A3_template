@@ -42,7 +42,7 @@ def generate_data(save_path, num_samples=500, N=25, use_multiprocessing=False):
             progress_counter = manager.Value('i', 0)  # Shared counter to track progress
             
             def label_computation(state):
-                result = is_in_BwRS(state, N)   ################
+                result = is_in_BwRS(state, N)   
                 with progress_counter.get_lock():
                     progress_counter.value += 1
                 # Print progress
@@ -111,7 +111,7 @@ def create_casadi_function(robot_name, NN_DIR, input_size, load_weights=True):
     # if load_weights is True, we load the neural-network weights from a ".pt" file
     if load_weights:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        nn_name = os.path.join(NN_DIR, 'model_50.pt') #################
+        nn_name = os.path.join(NN_DIR, 'model_200.pt')  ### Change this name to try different models, all the models are inside the nn_models folder ###
         nn_data = torch.load(nn_name, map_location=device)
         model = NeuralNetwork(input_size=input_size, hidden_size=32, output_size=1, activation=nn.Tanh())
         model.load_state_dict(nn_data['model'])  # Load the trained weights
