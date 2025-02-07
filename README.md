@@ -44,7 +44,7 @@ In this project, we incorporate the learned neural network into the MPC **termin
 ## Results
 I update:
 - A PDF report with detailed analysis:
-  [Download the report](A3_template/Report.pdf)
+  [Download the report](Report.pdf)
 
 ## Future Work
 - Extend to more complex robotic systems
