@@ -42,9 +42,9 @@ In this project, we incorporate the learned neural network into the MPC **termin
 - **Constraints:** Enforced using the learned invariant set.
 
 ## Results
-We will include:
-- Simulation videos demonstrating the effectiveness of the method
-- A PDF report with detailed analysis
+I update:
+- A PDF report with detailed analysis:
+  [Download the report](A3_Template/report.pdf)
 
 ## Future Work
 - Extend to more complex robotic systems
