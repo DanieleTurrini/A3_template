@@ -5,26 +5,28 @@
 This project explores the concept of learning an **approximate control-invariant set** to be used as a **terminal constraint** in a **Model Predictive Control (MPC)** formulation. The goal is to ensure recursive feasibility in an MPC problem by leveraging a learned **N-step backward reachable set**.
 
 ## Problem Definition
-We aim to determine whether an initial state \( x_{init} \) belongs to the N-step backward reachable set of \( S \), where:
-- \( S \) is the set of equilibrium states:
-  \[ S = \{ x \in X : \exists u \in U, x = f(x,u) \} \]
+We aim to determine whether an initial state $x_{init}$ belongs to the N-step backward reachable set of $S$, where:
+- $S$ is the set of equilibrium states:
+  $$ S = \{ x \in X : \exists u \in U, x = f(x,u) \} $$
   For a **robot manipulator**, this typically corresponds to **zero-velocity states**:
-  \[ S = \{ (q, \dot{q}) : q_{min} \leq q \leq q_{max}, \dot{q} = 0 \} \]
+  $$ S = \{ (q, \dot{q}) : q_{min} \leq q \leq q_{max}, \dot{q} = 0 \} $$
 
-To check if a state \( x_{init} \) belongs to the backward reachable set, we solve the following **Optimal Control Problem (OCP)**:
+To check if a state $x_{init}$ belongs to the backward reachable set, we solve the following **Optimal Control Problem (OCP)**:
 
-\[ \min_{X, U} 1 \]
+$$
+\min_{X, U} 1
+$$
 subject to:
- \( x_{i+1} = f(x_i, u_i) \) for \( i = 0, \dots, N-1 \)
- \( x_{i+1} \in X, u_i \in U \) for \( i = 0, \dots, N-1 \)
- \( x_0 = x_{init} \)
- \( x_N \in S \)
+- $x_{i+1} = f(x_i, u_i)$ for $i = 0, \dots, N-1$
+- $x_{i+1} \in X, u_i \in U$ for $i = 0, \dots, N-1$
+- $x_0 = x_{init}$
+- $x_N \in S$
 
-If the OCP has a solution, \( x_{init} \) belongs to the set; otherwise, it does not.
+If the OCP has a solution, $x_{init}$ belongs to the set; otherwise, it does not.
 
 ## Dataset Generation & Neural Network Training
 To approximate the backward reachable set:
-1. **Generate a dataset** by sampling random \( x_{init} \) values and solving the OCP.
+1. **Generate a dataset** by sampling random $x_{init}$ values and solving the OCP.
 2. **Label each state** as 0 (outside the set) or 1 (inside the set).
 3. **Train a neural network** to classify states as inside or outside the set.
 
@@ -49,4 +51,5 @@ We will include:
 - Explore different cost function formulations
 
 Stay tuned for updates! 🚀
+
 
