@@ -7,15 +7,15 @@ This project explores the concept of learning an **approximate control-invariant
 ## Problem Definition
 We aim to determine whether an initial state $x_{init}$ belongs to the N-step backward reachable set of $S$, where:
 - $S$ is the set of equilibrium states:
-  $$ S = \{ x \in X : \exists u \in U, x = f(x,u) \} $$
+  $ S = \{ x \in X : \exists u \in U, x = f(x,u) \} $
   For a **robot manipulator**, this typically corresponds to **zero-velocity states**:
-  $$ S = \{ (q, \dot{q}) : q_{min} \leq q \leq q_{max}, \dot{q} = 0 \} $$
+  $ S = \{ (q, \dot{q}) : q_{min} \leq q \leq q_{max}, \dot{q} = 0 \} $
 
 To check if a state $x_{init}$ belongs to the backward reachable set, we solve the following **Optimal Control Problem (OCP)**:
 
-$$
+$
 \min_{X, U} 1
-$$
+$
 subject to:
 - $x_{i+1} = f(x_i, u_i)$ for $i = 0, \dots, N-1$
 - $x_{i+1} \in X, u_i \in U$ for $i = 0, \dots, N-1$
